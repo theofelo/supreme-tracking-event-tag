@@ -15,5 +15,5 @@
 homepage: "https://supremetracking.io/"
 documentation: "https://supremetracking.io/gtm-tag-template/documentation"
 versions:
-  - sha: 26ff393
+  - sha: e092cd5
     changeNotes: Initial Version
