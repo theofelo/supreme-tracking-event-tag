@@ -395,7 +395,6 @@ ___TEMPLATE_PARAMETERS___
 
 
 ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
-
 const log = require('logToConsole');
 const getCookieValues = require('getCookieValues');
 const getTimestampMillis = require('getTimestampMillis');
@@ -409,10 +408,10 @@ const getType = require('getType');
 const readAnalyticsStorage = require('readAnalyticsStorage');
 
 // --- CONFIG ---
-const domain = data.trackingDomain;
+
 const token = data.ingestToken;
 const eventName = (data.eventName === 'custom') ? data.customEventName : data.eventName;
-const url = 'https://' + domain + '/public/ingest.php';
+const url = 'https://' + encodeURI(data.trackingDomain) + '/public/ingest.php';
 
 // --- HELPERS ---
 const generateUUID = () => {
@@ -459,7 +458,7 @@ if (foundStuid) {
 const gaData = readAnalyticsStorage();
 
 if (gaData.client_id) {
- userParams.ga4_client_id = gaData.client_id;
+ userParams.ga_client_id = gaData.client_id;
  
 }
 
@@ -482,7 +481,7 @@ if (
   }
 
   if (matchedSession && matchedSession.session_id) {
-    userParams.ga4_session_id = matchedSession.session_id;
+    userParams.ga_session_id = matchedSession.session_id;
   }
 }
 
@@ -514,6 +513,7 @@ const finalEventId = data.eventId || generateUUID();
 // 4. ENVIO (Supreme Send - Server Side)
 const payload = {
   token: token,
+  gads_conversion: data.sendGoogleAds, // <--- NOVA FLAG ADICIONADA AQUI
   context: {
     // Mapeia stuid para bpuid no backend para compatibilidade
     stuid: userParams.stuid, 
@@ -681,13 +681,38 @@ if (data.sendGoogleAds) {
         // 5. Dados do Usuário (Enhanced Conversions)
         if (data.gaUserProvidedData) {
             gAdsPayload.user_data = data.gaUserProvidedData;
+        } else {
+            // <--- INICIO DA LÓGICA DE CAPTURA AUTOMÁTICA (ENHANCED CONVERSIONS) --->
+            // Mapeia o que já foi capturado em userParams para o formato do Google Ads
+            let autoUserData = {};
+            
+            if (userParams.email) autoUserData.email = userParams.email;
+            if (userParams.phone) autoUserData.phone_number = userParams.phone;
+            
+            let addressInfo = {};
+            // Mapeamento dos campos da Tabela ParamTable1 para Google Ads Address
+            if (userParams.first_name) addressInfo.first_name = userParams.first_name;
+            if (userParams.last_name) addressInfo.last_name = userParams.last_name;
+            if (userParams.city) addressInfo.city = userParams.city;
+            if (userParams.state) addressInfo.region = userParams.state;
+            if (userParams.zip) addressInfo.postal_code = userParams.zip;
+            if (userParams.country) addressInfo.country = userParams.country;
+            
+            // Só adiciona o objeto address se tiver ao menos um campo preenchido
+            if (addressInfo.first_name || addressInfo.last_name || addressInfo.city || addressInfo.region || addressInfo.postal_code || addressInfo.country) {
+                autoUserData.address = addressInfo;
+            }
+            
+            if (autoUserData.email || autoUserData.phone_number || autoUserData.address) {
+                gAdsPayload.user_data = autoUserData;
+            }
+            // <--- FIM DA LÓGICA DE CAPTURA AUTOMÁTICA --->
         }
 
         // 6. Dispara o evento de conversão
         callInWindow('gtag', 'event', 'conversion', gAdsPayload);
     }
 }
-
 
 ___WEB_PERMISSIONS___
 
