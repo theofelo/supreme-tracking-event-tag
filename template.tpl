@@ -406,12 +406,13 @@ const getUrl = require('getUrl');
 const getType = require('getType');
 // API Nativa do GA4 (Síncrona)
 const readAnalyticsStorage = require('readAnalyticsStorage');
+const encodeUriComponent = require('encodeUriComponent');
 
 // --- CONFIG ---
 
 const token = data.ingestToken;
 const eventName = (data.eventName === 'custom') ? data.customEventName : data.eventName;
-const url = 'https://' + encodeURI(data.trackingDomain) + '/public/ingest.php';
+const url = 'https://' + encodeUriComponent(data.trackingDomain) + '/public/ingest.php';
 
 // --- HELPERS ---
 const generateUUID = () => {
