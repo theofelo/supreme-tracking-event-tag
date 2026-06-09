@@ -67,56 +67,56 @@ ___TEMPLATE_PARAMETERS___
   {
     "type": "SELECT",
     "name": "eventName",
-    "displayName": "Selecionar Evento",
+    "displayName": "Select Event",
     "macrosInSelect": false,
     "selectItems": [
       {
         "value": "page_view",
-        "displayValue": "Visualização de Página (Page View)"
+        "displayValue": "Page View"
       },
       {
         "value": "view_item",
-        "displayValue": "Visualizar Produto/Conteúdo (View Content)"
+        "displayValue": "View Content"
       },
       {
         "value": "add_to_cart",
-        "displayValue": "Adicionar ao Carrinho (Add To Cart)"
+        "displayValue": "Add To Cart"
       },
       {
         "value": "initiate_checkout",
-        "displayValue": "Iniciar Checkout (Initiate Checkout)"
+        "displayValue": "Initiate Checkout"
       },
       {
         "value": "add_payment_info",
-        "displayValue": "Adicionar Info. Pagamento (Add Payment Info)"
+        "displayValue": "Add Payment Info"
       },
       {
         "value": "purchase",
-        "displayValue": "Compra (Purchase)"
+        "displayValue": "Purchase"
       },
       {
         "value": "lead",
-        "displayValue": "Gerar Lead (Lead)"
+        "displayValue": "Lead"
       },
       {
         "value": "complete_registration",
-        "displayValue": "Cadastro Completo (Complete Registration)"
+        "displayValue": "Complete Registration"
       },
       {
         "value": "contact",
-        "displayValue": "Contato (Contact)"
+        "displayValue": "Contact"
       },
       {
         "value": "schedule",
-        "displayValue": "Agendamento (Schedule)"
+        "displayValue": "Schedule"
       },
       {
         "value": "search",
-        "displayValue": "Busca (Search)"
+        "displayValue": "Search"
       },
       {
         "value": "custom",
-        "displayValue": "⚡ Outro / Personalizado"
+        "displayValue": "Other / Custom"
       }
     ],
     "simpleValueType": true,
@@ -130,8 +130,13 @@ ___TEMPLATE_PARAMETERS___
   {
     "type": "TEXT",
     "name": "customEventName",
-    "displayName": "Nome do Evento Personalizado",
+    "displayName": "Custom Event Name",
     "simpleValueType": true,
+    "valueValidators": [
+      {
+        "type": "NON_EMPTY"
+      }
+    ],
     "enablingConditions": [
       {
         "paramName": "eventName",
@@ -189,75 +194,70 @@ ___TEMPLATE_PARAMETERS___
   {
     "type": "GROUP",
     "name": "customerInformation",
-    "displayName": "Dados do usuário",
+    "displayName": "User Data",
     "groupStyle": "ZIPPY_CLOSED",
-    "subParams": []
-  },
-  {
-    "type": "PARAM_TABLE",
-    "name": "paramTable1",
-    "displayName": "Parametros",
-    "paramTableColumns": [
+    "subParams": [
       {
-        "param": {
-          "type": "SELECT",
-          "name": "userParameter",
-          "displayName": "",
-          "macrosInSelect": false,
-          "selectItems": [
-            {
-              "value": "first_name",
-              "displayValue": "First Name"
+        "type": "PARAM_TABLE",
+        "name": "paramTable1",
+        "displayName": "Parameters",
+        "paramTableColumns": [
+          {
+            "param": {
+              "type": "SELECT",
+              "name": "userParameter",
+              "displayName": "",
+              "macrosInSelect": false,
+              "selectItems": [
+                {
+                  "value": "first_name",
+                  "displayValue": "First Name"
+                },
+                {
+                  "value": "last_name",
+                  "displayValue": "Last Name"
+                },
+                {
+                  "value": "phone",
+                  "displayValue": "Phone"
+                },
+                {
+                  "value": "email",
+                  "displayValue": "Email"
+                },
+                {
+                  "value": "city",
+                  "displayValue": "City"
+                },
+                {
+                  "value": "state",
+                  "displayValue": "State"
+                },
+                {
+                  "value": "zip",
+                  "displayValue": "Zip Code"
+                },
+                {
+                  "value": "country",
+                  "displayValue": "Country"
+                }
+              ],
+              "simpleValueType": true
             },
-            {
-              "value": "last_name",
-              "displayValue": "Last Name"
+            "isUnique": false
+          },
+          {
+            "param": {
+              "type": "TEXT",
+              "name": "userParameterValue",
+              "displayName": "",
+              "simpleValueType": true
             },
-            {
-              "value": "phone",
-              "displayValue": "Phone"
-            },
-            {
-              "value": "email",
-              "displayValue": "Email"
-            },
-            {
-              "value": "city",
-              "displayValue": "City"
-            },
-            {
-              "value": "state",
-              "displayValue": "State"
-            },
-            {
-              "value": "zip",
-              "displayValue": "Zip Code"
-            },
-            {
-              "value": "country",
-              "displayValue": "Country"
-            }
-          ],
-          "simpleValueType": true
-        },
-        "isUnique": false
-      },
-      {
-        "param": {
-          "type": "TEXT",
-          "name": "userParameterValue",
-          "displayName": "",
-          "simpleValueType": true
-        },
-        "isUnique": false
+            "isUnique": false
+          }
+        ]
       }
     ]
-  },
-  {
-    "type": "CHECKBOX",
-    "name": "commomParams",
-    "checkboxText": "Auto-capture common params",
-    "simpleValueType": true
   },
   {
     "type": "GROUP",
@@ -310,7 +310,7 @@ ___TEMPLATE_PARAMETERS___
       {
         "type": "TEXT",
         "name": "currency",
-        "displayName": "Moeda (currency)",
+        "displayName": "Currency",
         "simpleValueType": true,
         "valueHint": "BRL",
         "valueValidators": [
@@ -322,7 +322,7 @@ ___TEMPLATE_PARAMETERS___
       {
         "type": "TEXT",
         "name": "value",
-        "displayName": "Valor (value)",
+        "displayName": "Value",
         "simpleValueType": true,
         "valueHint": "97.54",
         "valueValidators": [
@@ -334,7 +334,7 @@ ___TEMPLATE_PARAMETERS___
       {
         "type": "SIMPLE_TABLE",
         "name": "itemsTable",
-        "displayName": "Itens (items)",
+        "displayName": "Items",
         "simpleTableColumns": [
           {
             "defaultValue": "",
@@ -388,6 +388,11 @@ ___TEMPLATE_PARAMETERS___
         "paramName": "eventName",
         "paramValue": "add_to_cart",
         "type": "EQUALS"
+      },
+      {
+        "paramName": "eventName",
+        "paramValue": "view_item",
+        "type": "EQUALS"
       }
     ]
   }
@@ -401,11 +406,10 @@ const getCookieValues = require('getCookieValues');
 const getTimestampMillis = require('getTimestampMillis');
 const generateRandom = require('generateRandom');
 const copyFromWindow = require('copyFromWindow');
-const JSON = require('JSON');
 const callInWindow = require('callInWindow');
 const getUrl = require('getUrl');
 const getType = require('getType');
-// API Nativa do GA4 (Síncrona)
+// GA4 native API (synchronous)
 const readAnalyticsStorage = require('readAnalyticsStorage');
 const encode = require('encodeUri');
 
@@ -422,14 +426,14 @@ const generateUUID = () => {
   return 'evt_' + time + '_' + rnd;
 };
 
-// 1. Polling Condicional (Facebook)
+// 1. Conditional polling (Facebook)
 const queryParams = getUrl('query') || '';
 const hasFbclid = (queryParams.indexOf('fbclid=') > -1);
 
-// 2. Prepara User Params Básicos
+// 2. Prepare basic user params
 let userParams = {};
 
-// Dados da Tabela Manual (Se houver)
+// Manual table data (if provided)
 if (data.paramTable1) {
   data.paramTable1.forEach(row => {
     if (row.userParameter && row.userParameterValue) {
@@ -438,14 +442,14 @@ if (data.paramTable1) {
   });
 }
 
-// Cookies Facebook (Fallback)
+// Facebook cookies (fallback)
 const fbpArr = getCookieValues('_fbp');
 const fbcArr = getCookieValues('_fbc');
 if (fbpArr && fbpArr.length) userParams.fbp = fbpArr[0];
 if (fbcArr && fbcArr.length) userParams.fbc = fbcArr[0];
 
-// --- CAPTURA: STUID (Via Cookie) ---
-// Lê o cookie 'stuid' OU 'bpuid'
+// --- CAPTURE: STUID (via cookie) ---
+// Reads the 'stuid' cookie (or 'bpuid')
 const stuidC = getCookieValues('stuid');
 let foundStuid = null;
 
@@ -455,8 +459,8 @@ if (foundStuid) {
     userParams.stuid = foundStuid;
 }
 
-// --- CAPTURA: GA4 IDs (API Oficial Síncrona) ---
-// Tenta ler do storage nativo do GA4 diretamente
+// --- CAPTURE: GA4 IDs (official synchronous API) ---
+// Reads directly from GA4 native storage
 const gaData = readAnalyticsStorage();
 
 if (gaData.client_id) {
@@ -464,7 +468,7 @@ if (gaData.client_id) {
  
 }
 
-// session_id depende do Measurement ID escolhido
+// session_id depends on the selected Measurement ID
 const targetMeasurementId = data.gaMeasurementId;
 
 if (
@@ -487,7 +491,7 @@ if (
   }
 }
 
-// 3. Monta Event Params
+// 3. Build event params
 let eventParams = {};
 if (data.paramTable2) {
   data.paramTable2.forEach(row => {
@@ -508,23 +512,23 @@ if (data.itemsTable && data.itemsTable.length) {
   }));
 }
 
-// --- PREPARA EVENT ID (CRUCIAL PARA DEDUPLICAÇÃO) ---
-// Definimos aqui para usar o MESMO ID no Server e no Browser
+// --- PREPARE EVENT ID (CRUCIAL FOR DEDUPLICATION) ---
+// Use the SAME ID for server and browser
 const finalEventId = data.eventId || generateUUID();
 
-// 4. ENVIO (Supreme Send - Server Side)
+// 4. SEND (Supreme Send - Server Side)
 const payload = {
   token: token,
-  gads_conversion: data.sendGoogleAds, // <--- NOVA FLAG ADICIONADA AQUI
+  gads_conversion: data.sendGoogleAds, // <--- NEW FLAG ADDED HERE
   context: {
-    // Mapeia stuid para bpuid no backend para compatibilidade
+    // Map stuid to bpuid on backend for compatibility
     stuid: userParams.stuid, 
     timestamp_ms: getTimestampMillis(),
     page: { url: getUrl() },
     user: userParams
   },
   events: [{
-    id: finalEventId, // Usa o ID gerado ou fornecido
+    id: finalEventId, // Use generated or provided ID
     name: eventName,
     data: { params: eventParams }
   }]
@@ -538,15 +542,21 @@ const config = {
   onFailure: data.gtmOnFailure
 };
 
-callInWindow('supremeSend', config);
+const supremeSend = copyFromWindow('supremeSend');
+if (supremeSend) {
+  callInWindow('supremeSend', config);
+} else {
+  log('supremeSend not found on window.');
+  data.gtmOnFailure();
+}
 
 // ==================================================================
-// 5. ENVIO META PIXEL (BROWSER SIDE - CONDICIONAL)
+// 5. SEND META PIXEL (BROWSER SIDE - CONDITIONAL)
 // ==================================================================
 
 if (data.sendBrowser) {
     
-    // Mapa de Eventos GA4 -> Meta Standard Events
+    // GA4 event map -> Meta Standard Events
     const metaEventMap = {
         'page_view': 'PageView',
         'purchase': 'Purchase',
@@ -569,31 +579,31 @@ if (data.sendBrowser) {
         'customize_product': 'CustomizeProduct'
     };
 
-    // Determina o nome do evento no Facebook
+    // Determine Facebook event name
     const fbEventName = metaEventMap[eventName] || eventName;
     
-    // Verifica se é evento padrão ou customizado
-    // Se estiver no mapa, é 'track'. Se não (ex: 'generate_lead_custom'), é 'trackCustom'.
+    // Check if standard or custom event
+    // If in map, use 'track'. Otherwise (e.g., 'generate_lead_custom'), use 'trackCustom'.
     const fbTrackType = metaEventMap[eventName] ? 'track' : 'trackCustom';
 
-    // Monta o objeto de dados específico para o Facebook
-    // O Facebook não aceita qualquer parâmetro arbitrário em eventos Standard.
-    // Abaixo filtramos e transformamos os dados para o formato aceito.
+    // Build the Facebook payload object
+    // Facebook does not accept arbitrary params in standard events.
+    // Filter and transform data to accepted format.
     let metaData = {};
 
-    // 1. Value e Currency (Obrigatórios para Purchase)
+    // 1. Value and Currency (required for Purchase)
     if (eventParams.value !== undefined) metaData.value = eventParams.value;
     if (eventParams.currency) metaData.currency = eventParams.currency;
 
-    // 2. Tratamento de Items -> content_ids
+    // 2. Items mapping -> content_ids
     if (eventParams.items && getType(eventParams.items) === 'array') {
         const contentIds = eventParams.items.map(item => item.item_id).filter(id => id !== undefined);
         if (contentIds.length > 0) {
             metaData.content_ids = contentIds;
-            // Assume product se houver items, a menos que especificado
+            // Assume product if items are present unless specified
             metaData.content_type = eventParams.content_type || 'product';
             
-            // Opcional: num_items (soma das quantidades)
+            // Optional: num_items (sum of quantities)
             /* let totalQty = 0;
             eventParams.items.forEach(i => totalQty += (Number(i.quantity) || 1));
             metaData.num_items = totalQty;
@@ -601,25 +611,25 @@ if (data.sendBrowser) {
         }
     }
 
-    // 3. Search String
+    // 3. Search string
     if (eventParams.search_term) {
         metaData.search_string = eventParams.search_term;
     }
     
-    // 4. Content Name (Mapeado de items ou passado direto)
+    // 4. Content name (from items or direct)
     if (eventParams.content_name) {
         metaData.content_name = eventParams.content_name;
     } else if (eventParams.items && eventParams.items.length === 1 && eventParams.items[0].item_name) {
-        // Se for apenas 1 item, usamos o nome dele como content_name (comum em ViewContent)
+        // If only 1 item, use its name as content_name (common for ViewContent)
         metaData.content_name = eventParams.items[0].item_name;
     }
 
-    // 5. Parâmetros Customizados
-    // Se o usuário passou parâmetros extras na Tabela 2 que não são padrão,
-    // podemos misturá-los, mas com cuidado. Para eventos 'trackCustom', tudo passa.
-    // Para 'track' (Standard), o FB ignora parâmetros desconhecidos, então é seguro enviar.
+    // 5. Custom parameters
+    // If the user passed extra params in table 2 that are not standard,
+    // we can include them carefully. For 'trackCustom', all pass.
+    // For 'track' (Standard), FB ignores unknown params, so it is safe to send.
     for (let key in eventParams) {
-        // Ignora chaves que já tratamos ou que são exclusivas do GA4
+        // Ignore keys already handled or GA4-only keys
         if (key !== 'items' && key !== 'value' && key !== 'currency' && key !== 'search_term') {
             if (!metaData[key]) {
                 metaData[key] = eventParams[key];
@@ -627,40 +637,40 @@ if (data.sendBrowser) {
         }
     }
 
-    // --- DISPARO BROWSER ---
-    // Estrutura: fbq('track', 'EventName', {params}, {eventID: '...'})
-    // O quarto argumento (options) é onde vai o eventID para deduplicação correta.
+    // --- BROWSER FIRE ---
+    // Structure: fbq('track', 'EventName', {params}, {eventID: '...'})
+    // The fourth argument (options) is where eventID goes for proper dedupe.
     
     callInWindow('fbq', fbTrackType, fbEventName, metaData, { eventID: finalEventId });
 }
 
 // ==================================================================
-// 6. ENVIO GOOGLE ADS (CONVERSION - CONDICIONAL)
+// 6. SEND GOOGLE ADS (CONVERSION - CONDITIONAL)
 // ==================================================================
 
 
 if (data.sendGoogleAds) {
-    // Verifica se os IDs essenciais estão presentes
+    // Check essential IDs
     if (data.conversionId && data.conversionLabel) {
         
-        // 1. Tratamento Inteligente do ID (Evita duplo AW-)
-        let cleanId = data.conversionId.trim(); // Remove espaços acidentais
+        // 1. Normalize ID (avoid double AW-)
+        let cleanId = data.conversionId.trim(); // Trim accidental spaces
         
-        // Verifica se já começa com 'AW-'. Se não, adiciona.
-        // (Usamos indexOf em vez de startsWith para máxima compatibilidade no GTM)
+        // If it already starts with 'AW-', keep it.
+        // (Use indexOf instead of startsWith for GTM compatibility)
         if (cleanId.indexOf('AW-') !== 0) {
             cleanId = 'AW-' + cleanId;
         }
 
-        // Monta o destino (send_to)
+        // Build send_to
         const sendToValue = cleanId + '/' + data.conversionLabel;
         
-        // 2. Inicia o Payload
+        // 2. Init payload
         let gAdsPayload = {
             'send_to': sendToValue
         };
 
-        // 3. Preenche Valor e Moeda (Reutiliza as variáveis já tratadas)
+        // 3. Set value and currency
         if (eventParams.value) {
             gAdsPayload.value = eventParams.value;
         }
@@ -675,43 +685,35 @@ if (data.sendGoogleAds) {
         if (gTransactionId) {
             gAdsPayload.transaction_id = gTransactionId;
         }
+
+        // 5. User data (Enhanced Conversions)
+        // <--- START AUTO CAPTURE LOGIC (ENHANCED CONVERSIONS) --->
+        // Map captured userParams to Google Ads format
+        let autoUserData = {};
         
-        if (gTransactionId) {
-            gAdsPayload.transaction_id = gTransactionId;
+        if (userParams.email) autoUserData.email = userParams.email;
+        if (userParams.phone) autoUserData.phone_number = userParams.phone;
+        
+        let addressInfo = {};
+        // Map ParamTable1 fields to Google Ads address
+        if (userParams.first_name) addressInfo.first_name = userParams.first_name;
+        if (userParams.last_name) addressInfo.last_name = userParams.last_name;
+        if (userParams.city) addressInfo.city = userParams.city;
+        if (userParams.state) addressInfo.region = userParams.state;
+        if (userParams.zip) addressInfo.postal_code = userParams.zip;
+        if (userParams.country) addressInfo.country = userParams.country;
+        
+        // Only add address if any field is present
+        if (addressInfo.first_name || addressInfo.last_name || addressInfo.city || addressInfo.region || addressInfo.postal_code || addressInfo.country) {
+          autoUserData.address = addressInfo;
         }
-
-        // 5. Dados do Usuário (Enhanced Conversions)
-        if (data.gaUserProvidedData) {
-            gAdsPayload.user_data = data.gaUserProvidedData;
-        } else {
-            // <--- INICIO DA LÓGICA DE CAPTURA AUTOMÁTICA (ENHANCED CONVERSIONS) --->
-            // Mapeia o que já foi capturado em userParams para o formato do Google Ads
-            let autoUserData = {};
-            
-            if (userParams.email) autoUserData.email = userParams.email;
-            if (userParams.phone) autoUserData.phone_number = userParams.phone;
-            
-            let addressInfo = {};
-            // Mapeamento dos campos da Tabela ParamTable1 para Google Ads Address
-            if (userParams.first_name) addressInfo.first_name = userParams.first_name;
-            if (userParams.last_name) addressInfo.last_name = userParams.last_name;
-            if (userParams.city) addressInfo.city = userParams.city;
-            if (userParams.state) addressInfo.region = userParams.state;
-            if (userParams.zip) addressInfo.postal_code = userParams.zip;
-            if (userParams.country) addressInfo.country = userParams.country;
-            
-            // Só adiciona o objeto address se tiver ao menos um campo preenchido
-            if (addressInfo.first_name || addressInfo.last_name || addressInfo.city || addressInfo.region || addressInfo.postal_code || addressInfo.country) {
-                autoUserData.address = addressInfo;
-            }
-            
-            if (autoUserData.email || autoUserData.phone_number || autoUserData.address) {
-                gAdsPayload.user_data = autoUserData;
-            }
-            // <--- FIM DA LÓGICA DE CAPTURA AUTOMÁTICA --->
+        
+        if (autoUserData.email || autoUserData.phone_number || autoUserData.address) {
+          gAdsPayload.user_data = autoUserData;
         }
+        // <--- END AUTO CAPTURE LOGIC --->
 
-        // 6. Dispara o evento de conversão
+        // 6. Fire conversion event
         callInWindow('gtag', 'event', 'conversion', gAdsPayload);
     }
 }
@@ -751,8 +753,21 @@ ___WEB_PERMISSIONS___
         {
           "key": "cookieAccess",
           "value": {
-            "type": 1,
-            "string": "any"
+            "type": 2,
+            "listItem": [
+              {
+                "type": 1,
+                "string": "_fbp"
+              },
+              {
+                "type": 1,
+                "string": "_fbc"
+              },
+              {
+                "type": 1,
+                "string": "stuid"
+              }
+            ]
           }
         }
       ]
@@ -914,13 +929,6 @@ ___WEB_PERMISSIONS___
             "type": 1,
             "string": "any"
           }
-        },
-        {
-          "key": "queriesAllowed",
-          "value": {
-            "type": 1,
-            "string": "any"
-          }
         }
       ]
     },
@@ -944,11 +952,162 @@ ___WEB_PERMISSIONS___
 
 ___TESTS___
 
-scenarios: []
+scenarios:
+  - name: Basic page_view sends server event
+    code: |-
+      let supremeConfig = null;
+
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+      });
+      mock('copyFromWindow', () => true);
+      mock('getUrl', (part) => {
+        if (part === 'query') return '';
+        return 'https://example.com/';
+      });
+      mock('getCookieValues', () => []);
+      mock('readAnalyticsStorage', () => ({ sessions: [] }));
+      mock('generateRandom', () => 123456789);
+      mock('getTimestampMillis', () => 1700000000000);
+
+      runCode({
+        trackingDomain: 'tracking.example.com',
+        ingestToken: 'token-1',
+        eventName: 'page_view',
+        sendBrowser: false,
+        sendGoogleAds: false,
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      assertThat(supremeConfig.url).isEqualTo('https://tracking.example.com/public/ingest.php');
+      assertThat(supremeConfig.payload.events[0].name).isEqualTo('page_view');
+
+  - name: Custom event name is used
+    code: |-
+      let supremeConfig = null;
+
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+      });
+      mock('copyFromWindow', () => true);
+      mock('getUrl', () => 'https://example.com/');
+      mock('getCookieValues', () => []);
+      mock('readAnalyticsStorage', () => ({ sessions: [] }));
+      mock('generateRandom', () => 111111111);
+      mock('getTimestampMillis', () => 1700000000001);
+
+      runCode({
+        trackingDomain: 'tracking.example.com',
+        ingestToken: 'token-2',
+        eventName: 'custom',
+        customEventName: 'my_custom_event',
+        sendBrowser: false,
+        sendGoogleAds: false,
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      assertThat(supremeConfig.payload.events[0].name).isEqualTo('my_custom_event');
+
+  - name: Purchase includes ecommerce params
+    code: |-
+      let supremeConfig = null;
+
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+      });
+      mock('copyFromWindow', () => true);
+      mock('getUrl', () => 'https://example.com/');
+      mock('getCookieValues', () => []);
+      mock('readAnalyticsStorage', () => ({ sessions: [] }));
+      mock('generateRandom', () => 222222222);
+      mock('getTimestampMillis', () => 1700000000002);
+
+      runCode({
+        trackingDomain: 'tracking.example.com',
+        ingestToken: 'token-3',
+        eventName: 'purchase',
+        currency: 'USD',
+        value: '99.99',
+        itemsTable: [
+          { item_id: 'sku-1', item_name: 'Item One', price: '49.99', quantity: '1' },
+          { item_id: 'sku-2', item_name: 'Item Two', price: '50.00', quantity: '1' }
+        ],
+        sendBrowser: false,
+        sendGoogleAds: false,
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      const params = supremeConfig.payload.events[0].data.params;
+      assertThat(params.currency).isEqualTo('USD');
+      assertThat(params.value).isEqualTo('99.99');
+      assertThat(params.items.length).isEqualTo(2);
+
+  - name: Browser send calls fbq with eventID
+    code: |-
+      let fbqArgs = null;
+
+      mock('callInWindow', (fnName, arg1, arg2, arg3, arg4) => {
+        if (fnName === 'fbq') fbqArgs = [arg1, arg2, arg3, arg4];
+      });
+      mock('getUrl', (part) => {
+        if (part === 'query') return '';
+        return 'https://example.com/';
+      });
+      mock('getCookieValues', () => []);
+      mock('readAnalyticsStorage', () => ({ sessions: [] }));
+      mock('generateRandom', () => 333333333);
+      mock('getTimestampMillis', () => 1700000000003);
+
+      runCode({
+        trackingDomain: 'tracking.example.com',
+        ingestToken: 'token-4',
+        eventName: 'page_view',
+        eventId: 'evt_test_1',
+        sendBrowser: true,
+        sendGoogleAds: false,
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      assertThat(fbqArgs[0]).isEqualTo('track');
+      assertThat(fbqArgs[1]).isEqualTo('PageView');
+      assertThat(fbqArgs[3].eventID).isEqualTo('evt_test_1');
+
+  - name: Google Ads conversion fires gtag
+    code: |-
+      let gtagArgs = null;
+
+      mock('callInWindow', (fnName, arg1, arg2, arg3) => {
+        if (fnName === 'gtag') gtagArgs = [arg1, arg2, arg3];
+      });
+      mock('getUrl', () => 'https://example.com/');
+      mock('getCookieValues', () => []);
+      mock('readAnalyticsStorage', () => ({ sessions: [] }));
+      mock('generateRandom', () => 444444444);
+      mock('getTimestampMillis', () => 1700000000004);
+
+      runCode({
+        trackingDomain: 'tracking.example.com',
+        ingestToken: 'token-5',
+        eventName: 'purchase',
+        conversionId: '123456789',
+        conversionLabel: 'abcDEF123',
+        value: '10.00',
+        currency: 'USD',
+        sendBrowser: false,
+        sendGoogleAds: true,
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      assertThat(gtagArgs[0]).isEqualTo('event');
+      assertThat(gtagArgs[1]).isEqualTo('conversion');
+      assertThat(gtagArgs[2].send_to).isEqualTo('AW-123456789/abcDEF123');
 
 
 ___NOTES___
 
 Created on 23/12/2025, 00:11:25
-
-
