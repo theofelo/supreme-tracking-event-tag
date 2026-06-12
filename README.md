@@ -37,6 +37,10 @@ Official GTM Template for **SupremeTracking.io**. This tag acts as the central e
 * **Conversion Label**: The specific label for the conversion action (e.g., `AbC_xYz123`).
 * **Enhanced Conversions**: The tag automatically uses the data entered in the **"Dados do usuário" (User Data)** section. No extra variable creation for `user_provided_data` is required.
 
+> **Reliability Note**: The Google Ads browser conversion is sent with `transport_type: 'beacon'`, which improves delivery on fast navigations/unloads. This is especially useful when using Data Layer triggers, where `Wait for Tags` is not available.
+
+> **Note on Server-Side Flag**: When you check "Send Conversion to Google Ads?", the tag also sends a `gads_conversion` flag to your Supreme Tracking server. This is used to display a Google Ads icon in your Event History table for better visualization. It also earmarks the event for future server-side Google Ads integrations (this server-side functionality is currently on standby and does not cause duplicate conversions).
+
 ---
 
 ## 📝 Data Mapping

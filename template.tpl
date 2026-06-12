@@ -36,19 +36,6 @@ ___TEMPLATE_PARAMETERS___
 [
   {
     "type": "TEXT",
-    "name": "trackingDomain",
-    "displayName": "Tracking Domain",
-    "simpleValueType": true,
-    "valueValidators": [
-      {
-        "type": "NON_EMPTY"
-      }
-    ],
-    "help": "Insert the domain where your Supreme Tracking installation is.",
-    "valueHint": "ex: tracking.yoursite.com"
-  },
-  {
-    "type": "TEXT",
     "name": "ingestToken",
     "displayName": "Ingest Token",
     "simpleValueType": true,
@@ -57,12 +44,6 @@ ___TEMPLATE_PARAMETERS___
         "type": "NON_EMPTY"
       }
     ]
-  },
-  {
-    "type": "TEXT",
-    "name": "gaMeasurementId",
-    "displayName": "GA4 Measurement ID (to match the id of the session)",
-    "simpleValueType": true
   },
   {
     "type": "SELECT",
@@ -153,45 +134,6 @@ ___TEMPLATE_PARAMETERS___
     "help": "Leave blank to automatically generate a unique ID for Server/Browser deduplication. Use a custom value only if synchronizing with an external pixel tag."
   },
   {
-    "type": "CHECKBOX",
-    "name": "sendBrowser",
-    "checkboxText": "Also send via browser (Meta Pixel)",
-    "simpleValueType": true,
-    "help": "Check to send the event via browser (Meta Pixel) alongside the server event. This ensures automatic deduplication. Note: If you prefer using a separate tag for the browser event, you MUST input the same Event ID in the field above to prevent double counting."
-  },
-  {
-    "type": "CHECKBOX",
-    "name": "sendGoogleAds",
-    "checkboxText": "Send Conversion to Google Ads?",
-    "simpleValueType": true
-  },
-  {
-    "type": "TEXT",
-    "name": "conversionId",
-    "displayName": "Google Ads Conversion ID",
-    "simpleValueType": true,
-    "enablingConditions": [
-      {
-        "paramName": "sendGoogleAds",
-        "paramValue": true,
-        "type": "EQUALS"
-      }
-    ]
-  },
-  {
-    "type": "TEXT",
-    "name": "conversionLabel",
-    "displayName": "Google Ads Conversion Label",
-    "simpleValueType": true,
-    "enablingConditions": [
-      {
-        "paramName": "sendGoogleAds",
-        "paramValue": true,
-        "type": "EQUALS"
-      }
-    ]
-  },
-  {
     "type": "GROUP",
     "name": "customerInformation",
     "displayName": "User Data",
@@ -224,6 +166,18 @@ ___TEMPLATE_PARAMETERS___
                 {
                   "value": "email",
                   "displayValue": "Email"
+                },
+                {
+                  "value": "gender",
+                  "displayValue": "Gender"
+                },
+                {
+                  "value": "date_of_birth",
+                  "displayValue": "Date of Birth (YYYYMMDD)"
+                },
+                {
+                  "value": "street",
+                  "displayValue": "Street Address"
                 },
                 {
                   "value": "city",
@@ -402,22 +356,16 @@ ___TEMPLATE_PARAMETERS___
 ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
 
 const log = require('logToConsole');
-const getCookieValues = require('getCookieValues');
 const getTimestampMillis = require('getTimestampMillis');
 const generateRandom = require('generateRandom');
 const copyFromWindow = require('copyFromWindow');
 const callInWindow = require('callInWindow');
 const getUrl = require('getUrl');
-const getType = require('getType');
-// GA4 native API (synchronous)
-const readAnalyticsStorage = require('readAnalyticsStorage');
-const encode = require('encodeUri');
 
 // --- CONFIG ---
 
 const token = data.ingestToken;
 const eventName = (data.eventName === 'custom') ? data.customEventName : data.eventName;
-const url = 'https://' + encode(data.trackingDomain) + '/public/ingest.php';
 
 // --- HELPERS ---
 const generateUUID = () => {
@@ -426,14 +374,12 @@ const generateUUID = () => {
   return 'evt_' + time + '_' + rnd;
 };
 
-// 1. Conditional polling (Facebook)
-const queryParams = getUrl('query') || '';
-const hasFbclid = (queryParams.indexOf('fbclid=') > -1);
-
-// 2. Prepare basic user params
+// Prepare user params from the User Data table only.
+// Identity cookies (_fbp/_fbc/stuid) and GA4 client/session IDs are owned by the
+// first-party loader (read fresh at fetch time) and resolved server-side by the
+// ingest, so the template no longer reads cookies or analytics storage.
 let userParams = {};
 
-// Manual table data (if provided)
 if (data.paramTable1) {
   data.paramTable1.forEach(row => {
     if (row.userParameter && row.userParameterValue) {
@@ -442,56 +388,7 @@ if (data.paramTable1) {
   });
 }
 
-// Facebook cookies (fallback)
-const fbpArr = getCookieValues('_fbp');
-const fbcArr = getCookieValues('_fbc');
-if (fbpArr && fbpArr.length) userParams.fbp = fbpArr[0];
-if (fbcArr && fbcArr.length) userParams.fbc = fbcArr[0];
-
-// --- CAPTURE: STUID (via cookie) ---
-// Reads the 'stuid' cookie (or 'bpuid')
-const stuidC = getCookieValues('stuid');
-let foundStuid = null;
-
-if (stuidC && stuidC.length) foundStuid = stuidC[0];
-
-if (foundStuid) {
-    userParams.stuid = foundStuid;
-}
-
-// --- CAPTURE: GA4 IDs (official synchronous API) ---
-// Reads directly from GA4 native storage
-const gaData = readAnalyticsStorage();
-
-if (gaData.client_id) {
- userParams.ga_client_id = gaData.client_id;
- 
-}
-
-// session_id depends on the selected Measurement ID
-const targetMeasurementId = data.gaMeasurementId;
-
-if (
-  targetMeasurementId &&
-  gaData.sessions &&
-  gaData.sessions.length
-) {
-  let matchedSession = null;
-
-  for (let i = 0; i < gaData.sessions.length; i++) {
-    const s = gaData.sessions[i];
-    if (s.measurement_id === targetMeasurementId) {
-      matchedSession = s;
-      break;
-    }
-  }
-
-  if (matchedSession && matchedSession.session_id) {
-    userParams.ga_session_id = matchedSession.session_id;
-  }
-}
-
-// 3. Build event params
+// Build event params
 let eventParams = {};
 if (data.paramTable2) {
   data.paramTable2.forEach(row => {
@@ -514,15 +411,16 @@ if (data.itemsTable && data.itemsTable.length) {
 
 // --- PREPARE EVENT ID (CRUCIAL FOR DEDUPLICATION) ---
 // Use the SAME ID for server and browser
-const finalEventId = data.eventId || generateUUID();
+const explicitEventId = data.eventId;
+const loaderPageViewId = copyFromWindow('SupremeTracking.pageViewId');
+const finalEventId =
+  explicitEventId ||
+  (eventName === 'page_view' && loaderPageViewId ? loaderPageViewId : generateUUID());
 
 // 4. SEND (Supreme Send - Server Side)
 const payload = {
   token: token,
-  gads_conversion: data.sendGoogleAds, // <--- NEW FLAG ADDED HERE
   context: {
-    // Map stuid to bpuid on backend for compatibility
-    stuid: userParams.stuid, 
     timestamp_ms: getTimestampMillis(),
     page: { url: getUrl() },
     user: userParams
@@ -535,9 +433,7 @@ const payload = {
 };
 
 const config = {
-  url: url,
   payload: payload,
-  waitForFbc: hasFbclid,
   onSuccess: data.gtmOnSuccess,
   onFailure: data.gtmOnFailure
 };
@@ -549,175 +445,6 @@ if (supremeSend) {
   log('supremeSend not found on window.');
   data.gtmOnFailure();
 }
-
-// ==================================================================
-// 5. SEND META PIXEL (BROWSER SIDE - CONDITIONAL)
-// ==================================================================
-
-if (data.sendBrowser) {
-    
-    // GA4 event map -> Meta Standard Events
-    const metaEventMap = {
-        'page_view': 'PageView',
-        'purchase': 'Purchase',
-        'add_to_cart': 'AddToCart',
-        'initiate_checkout': 'InitiateCheckout',
-        'view_item': 'ViewContent',
-        'add_payment_info': 'AddPaymentInfo',
-        'add_to_wishlist': 'AddToWishlist',
-        'refund': 'PurchaseRefund',
-        'lead': 'Lead',
-        'complete_registration': 'CompleteRegistration',
-        'submit_application': 'SubmitApplication',
-        'subscribe': 'Subscribe',
-        'start_trial': 'StartTrial',
-        'contact': 'Contact',
-        'search': 'Search',
-        'find_location': 'FindLocation',
-        'schedule': 'Schedule',
-        'donate': 'Donate',
-        'customize_product': 'CustomizeProduct'
-    };
-
-    // Determine Facebook event name
-    const fbEventName = metaEventMap[eventName] || eventName;
-    
-    // Check if standard or custom event
-    // If in map, use 'track'. Otherwise (e.g., 'generate_lead_custom'), use 'trackCustom'.
-    const fbTrackType = metaEventMap[eventName] ? 'track' : 'trackCustom';
-
-    // Build the Facebook payload object
-    // Facebook does not accept arbitrary params in standard events.
-    // Filter and transform data to accepted format.
-    let metaData = {};
-
-    // 1. Value and Currency (required for Purchase)
-    if (eventParams.value !== undefined) metaData.value = eventParams.value;
-    if (eventParams.currency) metaData.currency = eventParams.currency;
-
-    // 2. Items mapping -> content_ids
-    if (eventParams.items && getType(eventParams.items) === 'array') {
-        const contentIds = eventParams.items.map(item => item.item_id).filter(id => id !== undefined);
-        if (contentIds.length > 0) {
-            metaData.content_ids = contentIds;
-            // Assume product if items are present unless specified
-            metaData.content_type = eventParams.content_type || 'product';
-            
-            // Optional: num_items (sum of quantities)
-            /* let totalQty = 0;
-            eventParams.items.forEach(i => totalQty += (Number(i.quantity) || 1));
-            metaData.num_items = totalQty;
-            */
-        }
-    }
-
-    // 3. Search string
-    if (eventParams.search_term) {
-        metaData.search_string = eventParams.search_term;
-    }
-    
-    // 4. Content name (from items or direct)
-    if (eventParams.content_name) {
-        metaData.content_name = eventParams.content_name;
-    } else if (eventParams.items && eventParams.items.length === 1 && eventParams.items[0].item_name) {
-        // If only 1 item, use its name as content_name (common for ViewContent)
-        metaData.content_name = eventParams.items[0].item_name;
-    }
-
-    // 5. Custom parameters
-    // If the user passed extra params in table 2 that are not standard,
-    // we can include them carefully. For 'trackCustom', all pass.
-    // For 'track' (Standard), FB ignores unknown params, so it is safe to send.
-    for (let key in eventParams) {
-        // Ignore keys already handled or GA4-only keys
-        if (key !== 'items' && key !== 'value' && key !== 'currency' && key !== 'search_term') {
-            if (!metaData[key]) {
-                metaData[key] = eventParams[key];
-            }
-        }
-    }
-
-    // --- BROWSER FIRE ---
-    // Structure: fbq('track', 'EventName', {params}, {eventID: '...'})
-    // The fourth argument (options) is where eventID goes for proper dedupe.
-    
-    callInWindow('fbq', fbTrackType, fbEventName, metaData, { eventID: finalEventId });
-}
-
-// ==================================================================
-// 6. SEND GOOGLE ADS (CONVERSION - CONDITIONAL)
-// ==================================================================
-
-
-if (data.sendGoogleAds) {
-    // Check essential IDs
-    if (data.conversionId && data.conversionLabel) {
-        
-        // 1. Normalize ID (avoid double AW-)
-        let cleanId = data.conversionId.trim(); // Trim accidental spaces
-        
-        // If it already starts with 'AW-', keep it.
-        // (Use indexOf instead of startsWith for GTM compatibility)
-        if (cleanId.indexOf('AW-') !== 0) {
-            cleanId = 'AW-' + cleanId;
-        }
-
-        // Build send_to
-        const sendToValue = cleanId + '/' + data.conversionLabel;
-        
-        // 2. Init payload
-        let gAdsPayload = {
-            'send_to': sendToValue
-        };
-
-        // 3. Set value and currency
-        if (eventParams.value) {
-            gAdsPayload.value = eventParams.value;
-        }
-        
-        if (eventParams.currency) {
-            gAdsPayload.currency = eventParams.currency;
-        }
-
-        // 4. Transaction ID
-        const gTransactionId = eventParams.transaction_id || finalEventId;
-        
-        if (gTransactionId) {
-            gAdsPayload.transaction_id = gTransactionId;
-        }
-
-        // 5. User data (Enhanced Conversions)
-        // <--- START AUTO CAPTURE LOGIC (ENHANCED CONVERSIONS) --->
-        // Map captured userParams to Google Ads format
-        let autoUserData = {};
-        
-        if (userParams.email) autoUserData.email = userParams.email;
-        if (userParams.phone) autoUserData.phone_number = userParams.phone;
-        
-        let addressInfo = {};
-        // Map ParamTable1 fields to Google Ads address
-        if (userParams.first_name) addressInfo.first_name = userParams.first_name;
-        if (userParams.last_name) addressInfo.last_name = userParams.last_name;
-        if (userParams.city) addressInfo.city = userParams.city;
-        if (userParams.state) addressInfo.region = userParams.state;
-        if (userParams.zip) addressInfo.postal_code = userParams.zip;
-        if (userParams.country) addressInfo.country = userParams.country;
-        
-        // Only add address if any field is present
-        if (addressInfo.first_name || addressInfo.last_name || addressInfo.city || addressInfo.region || addressInfo.postal_code || addressInfo.country) {
-          autoUserData.address = addressInfo;
-        }
-        
-        if (autoUserData.email || autoUserData.phone_number || autoUserData.address) {
-          gAdsPayload.user_data = autoUserData;
-        }
-        // <--- END AUTO CAPTURE LOGIC --->
-
-        // 6. Fire conversion event
-        callInWindow('gtag', 'event', 'conversion', gAdsPayload);
-    }
-}
-
 
 ___WEB_PERMISSIONS___
 
@@ -734,40 +461,6 @@ ___WEB_PERMISSIONS___
           "value": {
             "type": 1,
             "string": "debug"
-          }
-        }
-      ]
-    },
-    "clientAnnotations": {
-      "isEditedByUser": true
-    },
-    "isRequired": true
-  },
-  {
-    "instance": {
-      "key": {
-        "publicId": "get_cookies",
-        "versionId": "1"
-      },
-      "param": [
-        {
-          "key": "cookieAccess",
-          "value": {
-            "type": 2,
-            "listItem": [
-              {
-                "type": 1,
-                "string": "_fbp"
-              },
-              {
-                "type": 1,
-                "string": "_fbc"
-              },
-              {
-                "type": 1,
-                "string": "stuid"
-              }
-            ]
           }
         }
       ]
@@ -827,84 +520,6 @@ ___WEB_PERMISSIONS___
                     "boolean": true
                   }
                 ]
-              },
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "key"
-                  },
-                  {
-                    "type": 1,
-                    "string": "read"
-                  },
-                  {
-                    "type": 1,
-                    "string": "write"
-                  },
-                  {
-                    "type": 1,
-                    "string": "execute"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
-                    "string": "fbq"
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  }
-                ]
-              },
-              {
-                "type": 3,
-                "mapKey": [
-                  {
-                    "type": 1,
-                    "string": "key"
-                  },
-                  {
-                    "type": 1,
-                    "string": "read"
-                  },
-                  {
-                    "type": 1,
-                    "string": "write"
-                  },
-                  {
-                    "type": 1,
-                    "string": "execute"
-                  }
-                ],
-                "mapValue": [
-                  {
-                    "type": 1,
-                    "string": "gtag"
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  },
-                  {
-                    "type": 8,
-                    "boolean": true
-                  }
-                ]
               }
             ]
           }
@@ -936,16 +551,6 @@ ___WEB_PERMISSIONS___
       "isEditedByUser": true
     },
     "isRequired": true
-  },
-  {
-    "instance": {
-      "key": {
-        "publicId": "read_analytics_storage",
-        "versionId": "1"
-      },
-      "param": []
-    },
-    "isRequired": true
   }
 ]
 
@@ -960,28 +565,91 @@ scenarios:
       mock('callInWindow', (fnName, config) => {
         if (fnName === 'supremeSend') supremeConfig = config;
       });
-      mock('copyFromWindow', () => true);
-      mock('getUrl', (part) => {
-        if (part === 'query') return '';
-        return 'https://example.com/';
-      });
-      mock('getCookieValues', () => []);
-      mock('readAnalyticsStorage', () => ({ sessions: [] }));
+      mock('copyFromWindow', (key) => key === 'supremeSend');
+      mock('getUrl', () => 'https://example.com/');
       mock('generateRandom', () => 123456789);
       mock('getTimestampMillis', () => 1700000000000);
 
       runCode({
-        trackingDomain: 'tracking.example.com',
         ingestToken: 'token-1',
         eventName: 'page_view',
-        sendBrowser: false,
-        sendGoogleAds: false,
         gtmOnSuccess: () => {},
         gtmOnFailure: () => {}
       });
 
-      assertThat(supremeConfig.url).isEqualTo('https://tracking.example.com/public/ingest.php');
       assertThat(supremeConfig.payload.events[0].name).isEqualTo('page_view');
+
+  - name: Page view adopts loader pageViewId
+    code: |-
+      let supremeConfig = null;
+
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+      });
+      mock('copyFromWindow', (key) => {
+        if (key === 'supremeSend') return true;
+        if (key === 'SupremeTracking.pageViewId') return 'pv_shared_1';
+        return undefined;
+      });
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 987654321);
+      mock('getTimestampMillis', () => 1700000000004);
+
+      runCode({
+        ingestToken: 'token-1b',
+        eventName: 'page_view',
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      assertThat(supremeConfig.payload.events[0].id).isEqualTo('pv_shared_1');
+
+  - name: Explicit eventId wins over loader pageViewId
+    code: |-
+      let supremeConfig = null;
+
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+      });
+      mock('copyFromWindow', (key) => {
+        if (key === 'supremeSend') return true;
+        if (key === 'SupremeTracking.pageViewId') return 'pv_shared_1';
+        return undefined;
+      });
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 876543219);
+      mock('getTimestampMillis', () => 1700000000005);
+
+      runCode({
+        ingestToken: 'token-1c',
+        eventName: 'page_view',
+        eventId: 'evt_operator',
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      assertThat(supremeConfig.payload.events[0].id).isEqualTo('evt_operator');
+
+  - name: Page view falls back to generated id without loader pageViewId
+    code: |-
+      let supremeConfig = null;
+
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+      });
+      mock('copyFromWindow', (key) => key === 'supremeSend');
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 444444444);
+      mock('getTimestampMillis', () => 1700000000006);
+
+      runCode({
+        ingestToken: 'token-1d',
+        eventName: 'page_view',
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      assertThat(supremeConfig.payload.events[0].id).isEqualTo('evt_1700000000006_444444444');
 
   - name: Custom event name is used
     code: |-
@@ -990,25 +658,45 @@ scenarios:
       mock('callInWindow', (fnName, config) => {
         if (fnName === 'supremeSend') supremeConfig = config;
       });
-      mock('copyFromWindow', () => true);
+      mock('copyFromWindow', (key) => key === 'supremeSend');
       mock('getUrl', () => 'https://example.com/');
-      mock('getCookieValues', () => []);
-      mock('readAnalyticsStorage', () => ({ sessions: [] }));
       mock('generateRandom', () => 111111111);
       mock('getTimestampMillis', () => 1700000000001);
 
       runCode({
-        trackingDomain: 'tracking.example.com',
         ingestToken: 'token-2',
         eventName: 'custom',
         customEventName: 'my_custom_event',
-        sendBrowser: false,
-        sendGoogleAds: false,
         gtmOnSuccess: () => {},
         gtmOnFailure: () => {}
       });
 
       assertThat(supremeConfig.payload.events[0].name).isEqualTo('my_custom_event');
+
+  - name: Non-page-view keeps generated id even when loader pageViewId exists
+    code: |-
+      let supremeConfig = null;
+
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+      });
+      mock('copyFromWindow', (key) => {
+        if (key === 'supremeSend') return true;
+        if (key === 'SupremeTracking.pageViewId') return 'pv_shared_1';
+        return undefined;
+      });
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 555555555);
+      mock('getTimestampMillis', () => 1700000000007);
+
+      runCode({
+        ingestToken: 'token-2b',
+        eventName: 'purchase',
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      assertThat(supremeConfig.payload.events[0].id).isEqualTo('evt_1700000000007_555555555');
 
   - name: Purchase includes ecommerce params
     code: |-
@@ -1017,15 +705,12 @@ scenarios:
       mock('callInWindow', (fnName, config) => {
         if (fnName === 'supremeSend') supremeConfig = config;
       });
-      mock('copyFromWindow', () => true);
+      mock('copyFromWindow', (key) => key === 'supremeSend');
       mock('getUrl', () => 'https://example.com/');
-      mock('getCookieValues', () => []);
-      mock('readAnalyticsStorage', () => ({ sessions: [] }));
       mock('generateRandom', () => 222222222);
       mock('getTimestampMillis', () => 1700000000002);
 
       runCode({
-        trackingDomain: 'tracking.example.com',
         ingestToken: 'token-3',
         eventName: 'purchase',
         currency: 'USD',
@@ -1034,8 +719,6 @@ scenarios:
           { item_id: 'sku-1', item_name: 'Item One', price: '49.99', quantity: '1' },
           { item_id: 'sku-2', item_name: 'Item Two', price: '50.00', quantity: '1' }
         ],
-        sendBrowser: false,
-        sendGoogleAds: false,
         gtmOnSuccess: () => {},
         gtmOnFailure: () => {}
       });
@@ -1045,67 +728,39 @@ scenarios:
       assertThat(params.value).isEqualTo('99.99');
       assertThat(params.items.length).isEqualTo(2);
 
-  - name: Browser send calls fbq with eventID
+  - name: Identity and ad-platform firing are delegated, not in the template
     code: |-
-      let fbqArgs = null;
+      let supremeConfig = null;
+      let extraCalls = [];
 
-      mock('callInWindow', (fnName, arg1, arg2, arg3, arg4) => {
-        if (fnName === 'fbq') fbqArgs = [arg1, arg2, arg3, arg4];
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+        else extraCalls.push(fnName);
       });
-      mock('getUrl', (part) => {
-        if (part === 'query') return '';
-        return 'https://example.com/';
-      });
-      mock('getCookieValues', () => []);
-      mock('readAnalyticsStorage', () => ({ sessions: [] }));
+      mock('copyFromWindow', (key) => key === 'supremeSend');
+      mock('getUrl', () => 'https://example.com/');
       mock('generateRandom', () => 333333333);
       mock('getTimestampMillis', () => 1700000000003);
 
       runCode({
-        trackingDomain: 'tracking.example.com',
         ingestToken: 'token-4',
-        eventName: 'page_view',
-        eventId: 'evt_test_1',
-        sendBrowser: true,
-        sendGoogleAds: false,
-        gtmOnSuccess: () => {},
-        gtmOnFailure: () => {}
-      });
-
-      assertThat(fbqArgs[0]).isEqualTo('track');
-      assertThat(fbqArgs[1]).isEqualTo('PageView');
-      assertThat(fbqArgs[3].eventID).isEqualTo('evt_test_1');
-
-  - name: Google Ads conversion fires gtag
-    code: |-
-      let gtagArgs = null;
-
-      mock('callInWindow', (fnName, arg1, arg2, arg3) => {
-        if (fnName === 'gtag') gtagArgs = [arg1, arg2, arg3];
-      });
-      mock('getUrl', () => 'https://example.com/');
-      mock('getCookieValues', () => []);
-      mock('readAnalyticsStorage', () => ({ sessions: [] }));
-      mock('generateRandom', () => 444444444);
-      mock('getTimestampMillis', () => 1700000000004);
-
-      runCode({
-        trackingDomain: 'tracking.example.com',
-        ingestToken: 'token-5',
         eventName: 'purchase',
-        conversionId: '123456789',
-        conversionLabel: 'abcDEF123',
-        value: '10.00',
-        currency: 'USD',
-        sendBrowser: false,
-        sendGoogleAds: true,
+        eventId: 'evt_test_1',
         gtmOnSuccess: () => {},
         gtmOnFailure: () => {}
       });
 
-      assertThat(gtagArgs[0]).isEqualTo('event');
-      assertThat(gtagArgs[1]).isEqualTo('conversion');
-      assertThat(gtagArgs[2].send_to).isEqualTo('AW-123456789/abcDEF123');
+      // The template talks only to the loader's supremeSend — never fbq/gtag.
+      assertThat(extraCalls.length).isEqualTo(0);
+      // Identity cookies / GA4 ids are no longer collected client-side.
+      const user = supremeConfig.payload.context.user;
+      assertThat(user.stuid).isEqualTo(undefined);
+      assertThat(user.fbp).isEqualTo(undefined);
+      assertThat(user.fbc).isEqualTo(undefined);
+      assertThat(user.ga_client_id).isEqualTo(undefined);
+      // The dead gads_conversion flag is gone from the payload.
+      assertThat(supremeConfig.payload.gads_conversion).isEqualTo(undefined);
+      assertThat(supremeConfig.payload.events[0].id).isEqualTo('evt_test_1');
 
 
 ___NOTES___
