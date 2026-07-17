@@ -52,10 +52,6 @@ ___TEMPLATE_PARAMETERS___
     "macrosInSelect": false,
     "selectItems": [
       {
-        "value": "page_view",
-        "displayValue": "Page View"
-      },
-      {
         "value": "view_item",
         "displayValue": "View Content"
       },
@@ -106,7 +102,7 @@ ___TEMPLATE_PARAMETERS___
         "type": "NON_EMPTY"
       }
     ],
-    "defaultValue": "page_view"
+    "defaultValue": "lead"
   },
   {
     "type": "TEXT",
@@ -367,28 +363,33 @@ const getUrl = require('getUrl');
 const token = data.ingestToken;
 const eventName = (data.eventName === 'custom') ? data.customEventName : data.eventName;
 
+// --- DEPRECATED PAGE VIEW ---
+if (eventName === 'page_view') {
+  data.gtmOnSuccess();
+  return;
+}
+
 // --- HELPERS ---
 const generateUUID = () => {
-  const rnd = generateRandom(100000000, 999999999); 
+  const rnd = generateRandom(100000000, 999999999);
   const time = getTimestampMillis();
   return 'evt_' + time + '_' + rnd;
 };
 
-// Prepare user params from the User Data table only.
-// Identity cookies (_fbp/_fbc/stuid) and GA4 client/session IDs are owned by the
-// first-party loader (read fresh at fetch time) and resolved server-side by the
-// ingest, so the template no longer reads cookies or analytics storage.
+// --- USER PARAMS ---
+const userParameterKeyMap = { date_of_birth: 'birth_date' };
 let userParams = {};
 
 if (data.paramTable1) {
   data.paramTable1.forEach(row => {
     if (row.userParameter && row.userParameterValue) {
-      userParams[row.userParameter] = row.userParameterValue;
+      const key = userParameterKeyMap[row.userParameter] || row.userParameter;
+      userParams[key] = row.userParameterValue;
     }
   });
 }
 
-// Build event params
+// --- EVENT PARAMS ---
 let eventParams = {};
 if (data.paramTable2) {
   data.paramTable2.forEach(row => {
@@ -409,26 +410,27 @@ if (data.itemsTable && data.itemsTable.length) {
   }));
 }
 
-// --- PREPARE EVENT ID (CRUCIAL FOR DEDUPLICATION) ---
-// Use the SAME ID for server and browser
-const explicitEventId = data.eventId;
-const loaderPageViewId = copyFromWindow('SupremeTracking.pageViewId');
-const finalEventId =
-  explicitEventId ||
-  (eventName === 'page_view' && loaderPageViewId ? loaderPageViewId : generateUUID());
+// --- EVENT ID ---
+const finalEventId = data.eventId || generateUUID();
 
-// 4. SEND (Supreme Send - Server Side)
+// --- SEND ---
 const payload = {
   token: token,
+  source_platform: 'gtm',
+  provider: 'gtm',
+  action_source: 'browser',
   context: {
     timestamp_ms: getTimestampMillis(),
     page: { url: getUrl() },
     user: userParams
   },
   events: [{
-    id: finalEventId, // Use generated or provided ID
+    id: finalEventId,
     name: eventName,
-    data: { params: eventParams }
+    data: {
+      params: eventParams,
+      _delivery: { source: 'gtm_event_tag', mode: 'supreme_send' }
+    }
   }]
 };
 
@@ -558,13 +560,12 @@ ___WEB_PERMISSIONS___
 ___TESTS___
 
 scenarios:
-  - name: Basic page_view sends server event
+  - name: Deprecated page_view choice succeeds without dispatching
     code: |-
-      let supremeConfig = null;
+      let dispatched = false;
+      let succeeded = false;
 
-      mock('callInWindow', (fnName, config) => {
-        if (fnName === 'supremeSend') supremeConfig = config;
-      });
+      mock('callInWindow', () => { dispatched = true; });
       mock('copyFromWindow', (key) => key === 'supremeSend');
       mock('getUrl', () => 'https://example.com/');
       mock('generateRandom', () => 123456789);
@@ -573,64 +574,36 @@ scenarios:
       runCode({
         ingestToken: 'token-1',
         eventName: 'page_view',
-        gtmOnSuccess: () => {},
+        gtmOnSuccess: () => { succeeded = true; },
         gtmOnFailure: () => {}
       });
 
-      assertThat(supremeConfig.payload.events[0].name).isEqualTo('page_view');
+      assertThat(dispatched).isEqualTo(false);
+      assertThat(succeeded).isEqualTo(true);
 
-  - name: Page view adopts loader pageViewId
+  - name: Custom event named page_view also succeeds without dispatching
     code: |-
-      let supremeConfig = null;
+      let dispatched = false;
+      let succeeded = false;
 
-      mock('callInWindow', (fnName, config) => {
-        if (fnName === 'supremeSend') supremeConfig = config;
-      });
-      mock('copyFromWindow', (key) => {
-        if (key === 'supremeSend') return true;
-        if (key === 'SupremeTracking.pageViewId') return 'pv_shared_1';
-        return undefined;
-      });
+      mock('callInWindow', () => { dispatched = true; });
+      mock('copyFromWindow', (key) => key === 'supremeSend');
       mock('getUrl', () => 'https://example.com/');
-      mock('generateRandom', () => 987654321);
-      mock('getTimestampMillis', () => 1700000000004);
+      mock('generateRandom', () => 123456790);
+      mock('getTimestampMillis', () => 1700000000000);
 
       runCode({
-        ingestToken: 'token-1b',
-        eventName: 'page_view',
-        gtmOnSuccess: () => {},
+        ingestToken: 'token-1a',
+        eventName: 'custom',
+        customEventName: 'page_view',
+        gtmOnSuccess: () => { succeeded = true; },
         gtmOnFailure: () => {}
       });
 
-      assertThat(supremeConfig.payload.events[0].id).isEqualTo('pv_shared_1');
+      assertThat(dispatched).isEqualTo(false);
+      assertThat(succeeded).isEqualTo(true);
 
-  - name: Explicit eventId wins over loader pageViewId
-    code: |-
-      let supremeConfig = null;
-
-      mock('callInWindow', (fnName, config) => {
-        if (fnName === 'supremeSend') supremeConfig = config;
-      });
-      mock('copyFromWindow', (key) => {
-        if (key === 'supremeSend') return true;
-        if (key === 'SupremeTracking.pageViewId') return 'pv_shared_1';
-        return undefined;
-      });
-      mock('getUrl', () => 'https://example.com/');
-      mock('generateRandom', () => 876543219);
-      mock('getTimestampMillis', () => 1700000000005);
-
-      runCode({
-        ingestToken: 'token-1c',
-        eventName: 'page_view',
-        eventId: 'evt_operator',
-        gtmOnSuccess: () => {},
-        gtmOnFailure: () => {}
-      });
-
-      assertThat(supremeConfig.payload.events[0].id).isEqualTo('evt_operator');
-
-  - name: Page view falls back to generated id without loader pageViewId
+  - name: Explicit eventId wins over a generated id
     code: |-
       let supremeConfig = null;
 
@@ -639,17 +612,39 @@ scenarios:
       });
       mock('copyFromWindow', (key) => key === 'supremeSend');
       mock('getUrl', () => 'https://example.com/');
-      mock('generateRandom', () => 444444444);
-      mock('getTimestampMillis', () => 1700000000006);
+      mock('generateRandom', () => 876543219);
+      mock('getTimestampMillis', () => 1700000000005);
 
       runCode({
-        ingestToken: 'token-1d',
-        eventName: 'page_view',
+        ingestToken: 'token-1c',
+        eventName: 'purchase',
+        eventId: 'evt_operator',
         gtmOnSuccess: () => {},
         gtmOnFailure: () => {}
       });
 
-      assertThat(supremeConfig.payload.events[0].id).isEqualTo('evt_1700000000006_444444444');
+      assertThat(supremeConfig.payload.events[0].id).isEqualTo('evt_operator');
+
+  - name: Blank eventId falls back to a generated id
+    code: |-
+      let supremeConfig = null;
+
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+      });
+      mock('copyFromWindow', (key) => key === 'supremeSend');
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 555555555);
+      mock('getTimestampMillis', () => 1700000000007);
+
+      runCode({
+        ingestToken: 'token-2b',
+        eventName: 'purchase',
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      assertThat(supremeConfig.payload.events[0].id).isEqualTo('evt_1700000000007_555555555');
 
   - name: Custom event name is used
     code: |-
@@ -672,31 +667,6 @@ scenarios:
       });
 
       assertThat(supremeConfig.payload.events[0].name).isEqualTo('my_custom_event');
-
-  - name: Non-page-view keeps generated id even when loader pageViewId exists
-    code: |-
-      let supremeConfig = null;
-
-      mock('callInWindow', (fnName, config) => {
-        if (fnName === 'supremeSend') supremeConfig = config;
-      });
-      mock('copyFromWindow', (key) => {
-        if (key === 'supremeSend') return true;
-        if (key === 'SupremeTracking.pageViewId') return 'pv_shared_1';
-        return undefined;
-      });
-      mock('getUrl', () => 'https://example.com/');
-      mock('generateRandom', () => 555555555);
-      mock('getTimestampMillis', () => 1700000000007);
-
-      runCode({
-        ingestToken: 'token-2b',
-        eventName: 'purchase',
-        gtmOnSuccess: () => {},
-        gtmOnFailure: () => {}
-      });
-
-      assertThat(supremeConfig.payload.events[0].id).isEqualTo('evt_1700000000007_555555555');
 
   - name: Purchase includes ecommerce params
     code: |-
@@ -728,6 +698,57 @@ scenarios:
       assertThat(params.value).isEqualTo('99.99');
       assertThat(params.items.length).isEqualTo(2);
 
+  - name: Root provenance and per-event delivery are emitted
+    code: |-
+      let supremeConfig = null;
+
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+      });
+      mock('copyFromWindow', (key) => key === 'supremeSend');
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 135792468);
+      mock('getTimestampMillis', () => 1700000000008);
+
+      runCode({
+        ingestToken: 'token-5',
+        eventName: 'lead',
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      assertThat(supremeConfig.payload.source_platform).isEqualTo('gtm');
+      assertThat(supremeConfig.payload.provider).isEqualTo('gtm');
+      assertThat(supremeConfig.payload.action_source).isEqualTo('browser');
+      assertThat(supremeConfig.payload.events[0].data._delivery.source).isEqualTo('gtm_event_tag');
+      assertThat(supremeConfig.payload.events[0].data._delivery.mode).isEqualTo('supreme_send');
+
+  - name: date_of_birth user parameter maps to canonical birth_date
+    code: |-
+      let supremeConfig = null;
+
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+      });
+      mock('copyFromWindow', (key) => key === 'supremeSend');
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 246813579);
+      mock('getTimestampMillis', () => 1700000000009);
+
+      runCode({
+        ingestToken: 'token-6',
+        eventName: 'lead',
+        paramTable1: [
+          { userParameter: 'date_of_birth', userParameterValue: '1990-01-02' }
+        ],
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      const user = supremeConfig.payload.context.user;
+      assertThat(user.birth_date).isEqualTo('1990-01-02');
+      assertThat(user.date_of_birth).isEqualTo(undefined);
+
   - name: Identity and ad-platform firing are delegated, not in the template
     code: |-
       let supremeConfig = null;
@@ -750,15 +771,12 @@ scenarios:
         gtmOnFailure: () => {}
       });
 
-      // The template talks only to the loader's supremeSend — never fbq/gtag.
       assertThat(extraCalls.length).isEqualTo(0);
-      // Identity cookies / GA4 ids are no longer collected client-side.
       const user = supremeConfig.payload.context.user;
       assertThat(user.stuid).isEqualTo(undefined);
       assertThat(user.fbp).isEqualTo(undefined);
       assertThat(user.fbc).isEqualTo(undefined);
       assertThat(user.ga_client_id).isEqualTo(undefined);
-      // The dead gads_conversion flag is gone from the payload.
       assertThat(supremeConfig.payload.gads_conversion).isEqualTo(undefined);
       assertThat(supremeConfig.payload.events[0].id).isEqualTo('evt_test_1');
 
