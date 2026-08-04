@@ -1,0 +1,13 @@
+{
+  "repo": "supreme-tracking-event-tag",
+  "command": "node verify.js",
+  "note": "GTM custom template satellite. The template itself is sandboxed JS inside template.tpl, so the harness in tests/Compatibility/ evaluates it against the canonical event contract rather than importing it.",
+  "suites": {
+    "contract": {
+      "when": ["template.tpl", "metadata.yaml", "tests/Compatibility/**"],
+      "crossRepo": true,
+      "tests": ["tests/Compatibility/gtm-compatibility.test.js"],
+      "describe": "The tag's emitted payload against event-ingestion-contract-v1, plus the sandbox-permission floor (identity cookies and GA4 ids must stay uncollected)."
+    }
+  }
+}
