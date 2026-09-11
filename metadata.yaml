@@ -15,6 +15,8 @@
 homepage: "https://supremetracking.io/"
 documentation: "https://supremetracking.io/documentation/gtm-tag-template-documentation.php"
 versions:
+  - sha: 1286e908d3d98aa39c570ea6aaf7fec3f5ec200f
+    changeNotes: Event provenance (source_platform, provider, per-event _delivery); page_view is now emitted by the first-party loader
   - sha: 188177d1c2f46606d0de77bdb01199dbd82937ee
     changeNotes: Update metadata to latest version
   - sha: a070b7312b70e02a2061c12712e58d0fda8d14f2
