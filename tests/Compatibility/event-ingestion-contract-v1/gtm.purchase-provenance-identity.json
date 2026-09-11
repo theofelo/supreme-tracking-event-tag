@@ -1,0 +1,139 @@
+{
+  "schema": "event-ingestion-contract-v1",
+  "case": "gtm.purchase-provenance-identity",
+  "entrypoint": "browser",
+  "submissions": 2,
+  "request": {
+    "token": "fixture-token",
+    "source_platform": "gtm",
+    "provider": "gtm",
+    "action_source": "browser",
+    "context": {
+      "timestamp_ms": 1700000000000,
+      "page": {
+        "url": "https://merchant.example/checkout/thank-you"
+      },
+      "user": {
+        "email": "buyer@example.com",
+        "phone": "+55 (11) 99999-0000",
+        "first_name": "Ana",
+        "last_name": "Silva",
+        "birth_date": "1990-01-02",
+        "city": "Sao Paulo",
+        "state": "SP",
+        "zip": "01000-000",
+        "country": "BR"
+      }
+    },
+    "events": [
+      {
+        "id": "gtm_purchase_fixture_1",
+        "name": "purchase",
+        "data": {
+          "params": {
+            "value": "197.90",
+            "currency": "BRL",
+            "items": [
+              {
+                "item_id": "sku-1",
+                "item_name": "Fixture Item",
+                "price": "197.90",
+                "quantity": "1"
+              }
+            ]
+          },
+          "_delivery": {
+            "source": "gtm_event_tag",
+            "mode": "supreme_send"
+          }
+        }
+      }
+    ]
+  },
+  "server": {
+    "origin": "https://merchant.example",
+    "host": "track.merchant.example",
+    "remote_addr": "203.0.113.24",
+    "user_agent": "gtm-contract-fixture"
+  },
+  "expected": {
+    "canonical": [
+      {
+        "event_id": "gtm_purchase_fixture_1",
+        "event_name": "purchase",
+        "event_time": 1700000000,
+        "channel": "webevents",
+        "action_source": "browser",
+        "provider": "gtm",
+        "property_id": 1,
+        "source": "browser",
+        "source_platform": "gtm",
+        "context": {
+          "stuid": null,
+          "session_id": null,
+          "session": null,
+          "page_title": null,
+          "referrer": null,
+          "ip_address": "203.0.113.24",
+          "user_agent": "gtm-contract-fixture",
+          "utm": {},
+          "tracking_ids": {},
+          "cookies": {},
+          "ingest_host": "merchant.example",
+          "page_url": "https://merchant.example/checkout/thank-you"
+        },
+        "user": {
+          "email": "buyer@example.com",
+          "phone": "5511999990000",
+          "first_name": "ana",
+          "last_name": "silva",
+          "full_name": null,
+          "company": null,
+          "job_title": null,
+          "street": null,
+          "street2": null,
+          "city": "Sao Paulo",
+          "state": "SP",
+          "zip": "01000-000",
+          "country": "BR",
+          "gender": null,
+          "birth_date": "1990-01-02",
+          "external_id": null,
+          "lead_source": null,
+          "ip_address": null,
+          "user_agent": null,
+          "custom_traits": []
+        },
+        "params": {
+          "value": "197.90",
+          "currency": "BRL",
+          "items": [
+            {
+              "item_id": "sku-1",
+              "item_name": "Fixture Item",
+              "price": "197.90",
+              "quantity": "1"
+            }
+          ]
+        },
+        "_delivery": {
+          "source": "gtm_event_tag",
+          "mode": "supreme_send"
+        }
+      }
+    ],
+    "persistence": {
+      "rows": 1,
+      "event_ids": [
+        "gtm_purchase_fixture_1"
+      ]
+    },
+    "forwarding": {
+      "calls": 1,
+      "event_ids": [
+        "gtm_purchase_fixture_1"
+      ]
+    }
+  },
+  "mask": []
+}

@@ -1,0 +1,109 @@
+{
+  "schema": "event-ingestion-contract-v1",
+  "case": "gtm.lead-generated-event-id",
+  "entrypoint": "browser",
+  "submissions": 2,
+  "request": {
+    "token": "fixture-token",
+    "source_platform": "gtm",
+    "provider": "gtm",
+    "action_source": "browser",
+    "context": {
+      "timestamp_ms": 1700000000006,
+      "page": {
+        "url": "https://merchant.example/contact"
+      },
+      "user": {
+        "email": "lead@example.com"
+      }
+    },
+    "events": [
+      {
+        "id": "evt_1700000000006_444444444",
+        "name": "lead",
+        "data": {
+          "params": {},
+          "_delivery": {
+            "source": "gtm_event_tag",
+            "mode": "supreme_send"
+          }
+        }
+      }
+    ]
+  },
+  "server": {
+    "origin": "https://merchant.example",
+    "host": "track.merchant.example",
+    "remote_addr": "203.0.113.24",
+    "user_agent": "gtm-contract-fixture"
+  },
+  "expected": {
+    "canonical": [
+      {
+        "event_id": "evt_1700000000006_444444444",
+        "event_name": "lead",
+        "event_time": 1700000000,
+        "channel": "webevents",
+        "action_source": "browser",
+        "provider": "gtm",
+        "property_id": 1,
+        "source": "browser",
+        "source_platform": "gtm",
+        "context": {
+          "stuid": null,
+          "session_id": null,
+          "session": null,
+          "page_title": null,
+          "referrer": null,
+          "ip_address": "203.0.113.24",
+          "user_agent": "gtm-contract-fixture",
+          "utm": {},
+          "tracking_ids": {},
+          "cookies": {},
+          "ingest_host": "merchant.example",
+          "page_url": "https://merchant.example/contact"
+        },
+        "user": {
+          "email": "lead@example.com",
+          "phone": null,
+          "first_name": null,
+          "last_name": null,
+          "full_name": null,
+          "company": null,
+          "job_title": null,
+          "street": null,
+          "street2": null,
+          "city": null,
+          "state": null,
+          "zip": null,
+          "country": null,
+          "gender": null,
+          "birth_date": null,
+          "external_id": null,
+          "lead_source": null,
+          "ip_address": null,
+          "user_agent": null,
+          "custom_traits": []
+        },
+        "params": {},
+        "_delivery": {
+          "source": "gtm_event_tag",
+          "mode": "supreme_send"
+        }
+      }
+    ],
+    "persistence": {
+      "rows": 1,
+      "event_ids": [
+        "evt_1700000000006_444444444"
+      ]
+    },
+    "forwarding": {
+      "calls": 1,
+      "event_ids": [
+        "evt_1700000000006_444444444"
+      ]
+    }
+  },
+  "mask": []
+}
