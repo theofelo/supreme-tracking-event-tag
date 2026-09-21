@@ -41,7 +41,6 @@ test('only the declared permissions are requested', function () {
 
 test('a legacy saved page_view tag succeeds without dispatching', function () {
   const result = runTemplate({
-    ingestToken: 'token-legacy',
     eventName: 'page_view'
   });
 
@@ -53,7 +52,6 @@ test('a legacy saved page_view tag succeeds without dispatching', function () {
 
 test('a custom event literally named page_view also succeeds without dispatching', function () {
   const result = runTemplate({
-    ingestToken: 'token-legacy-custom',
     eventName: 'custom',
     customEventName: 'page_view'
   });
@@ -64,7 +62,6 @@ test('a custom event literally named page_view also succeeds without dispatching
 
 test('root provenance and per-event delivery are emitted on a real dispatch', function () {
   const result = runTemplate({
-    ingestToken: 'token-1',
     eventName: 'lead'
   });
 
@@ -77,7 +74,6 @@ test('root provenance and per-event delivery are emitted on a real dispatch', fu
 
 test('date_of_birth user parameter maps to canonical birth_date', function () {
   const result = runTemplate({
-    ingestToken: 'token-2',
     eventName: 'lead',
     paramTable1: [
       { userParameter: 'date_of_birth', userParameterValue: '1990-01-02' },
@@ -93,7 +89,6 @@ test('date_of_birth user parameter maps to canonical birth_date', function () {
 
 test('explicit eventId wins over a generated id', function () {
   const result = runTemplate({
-    ingestToken: 'token-3',
     eventName: 'purchase',
     eventId: 'evt_operator'
   });
@@ -103,7 +98,6 @@ test('explicit eventId wins over a generated id', function () {
 
 test('a blank eventId falls back to a generated id', function () {
   const result = runTemplate({
-    ingestToken: 'token-4',
     eventName: 'purchase'
   }, {
     generateRandom: function () { return 444444444; },
@@ -115,7 +109,6 @@ test('a blank eventId falls back to a generated id', function () {
 
 test('identity cookies and GA4 ids stay uncollected in the template payload', function () {
   const result = runTemplate({
-    ingestToken: 'token-5',
     eventName: 'purchase',
     eventId: 'evt_test_1'
   });

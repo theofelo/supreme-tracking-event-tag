@@ -35,17 +35,6 @@ ___TEMPLATE_PARAMETERS___
 
 [
   {
-    "type": "TEXT",
-    "name": "ingestToken",
-    "displayName": "Ingest Token",
-    "simpleValueType": true,
-    "valueValidators": [
-      {
-        "type": "NON_EMPTY"
-      }
-    ]
-  },
-  {
     "type": "SELECT",
     "name": "eventName",
     "displayName": "Select Event",
@@ -360,7 +349,6 @@ const getUrl = require('getUrl');
 
 // --- CONFIG ---
 
-const token = data.ingestToken;
 const eventName = (data.eventName === 'custom') ? data.customEventName : data.eventName;
 
 // --- DEPRECATED PAGE VIEW ---
@@ -415,7 +403,6 @@ const finalEventId = data.eventId || generateUUID();
 
 // --- SEND ---
 const payload = {
-  token: token,
   source_platform: 'gtm',
   provider: 'gtm',
   action_source: 'browser',
@@ -572,7 +559,6 @@ scenarios:
       mock('getTimestampMillis', () => 1700000000000);
 
       runCode({
-        ingestToken: 'token-1',
         eventName: 'page_view',
         gtmOnSuccess: () => { succeeded = true; },
         gtmOnFailure: () => {}
@@ -593,7 +579,6 @@ scenarios:
       mock('getTimestampMillis', () => 1700000000000);
 
       runCode({
-        ingestToken: 'token-1a',
         eventName: 'custom',
         customEventName: 'page_view',
         gtmOnSuccess: () => { succeeded = true; },
@@ -616,7 +601,6 @@ scenarios:
       mock('getTimestampMillis', () => 1700000000005);
 
       runCode({
-        ingestToken: 'token-1c',
         eventName: 'purchase',
         eventId: 'evt_operator',
         gtmOnSuccess: () => {},
@@ -638,7 +622,6 @@ scenarios:
       mock('getTimestampMillis', () => 1700000000007);
 
       runCode({
-        ingestToken: 'token-2b',
         eventName: 'purchase',
         gtmOnSuccess: () => {},
         gtmOnFailure: () => {}
@@ -659,7 +642,6 @@ scenarios:
       mock('getTimestampMillis', () => 1700000000001);
 
       runCode({
-        ingestToken: 'token-2',
         eventName: 'custom',
         customEventName: 'my_custom_event',
         gtmOnSuccess: () => {},
@@ -681,7 +663,6 @@ scenarios:
       mock('getTimestampMillis', () => 1700000000002);
 
       runCode({
-        ingestToken: 'token-3',
         eventName: 'purchase',
         currency: 'USD',
         value: '99.99',
@@ -711,7 +692,6 @@ scenarios:
       mock('getTimestampMillis', () => 1700000000008);
 
       runCode({
-        ingestToken: 'token-5',
         eventName: 'lead',
         gtmOnSuccess: () => {},
         gtmOnFailure: () => {}
@@ -736,7 +716,6 @@ scenarios:
       mock('getTimestampMillis', () => 1700000000009);
 
       runCode({
-        ingestToken: 'token-6',
         eventName: 'lead',
         paramTable1: [
           { userParameter: 'date_of_birth', userParameterValue: '1990-01-02' }
@@ -764,7 +743,6 @@ scenarios:
       mock('getTimestampMillis', () => 1700000000003);
 
       runCode({
-        ingestToken: 'token-4',
         eventName: 'purchase',
         eventId: 'evt_test_1',
         gtmOnSuccess: () => {},

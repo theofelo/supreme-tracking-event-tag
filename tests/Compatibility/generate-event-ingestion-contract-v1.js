@@ -114,7 +114,6 @@ function fixture(caseId, request) {
 
 function buildFixtures() {
   const purchase = runTemplate({
-    ingestToken: 'fixture-token',
     eventName: 'purchase',
     eventId: 'gtm_purchase_fixture_1',
     currency: 'BRL',
@@ -139,7 +138,6 @@ function buildFixtures() {
   }).supremeConfig.payload;
 
   const lead = runTemplate({
-    ingestToken: 'fixture-token',
     eventName: 'lead',
     paramTable1: [
       { userParameter: 'email', userParameterValue: 'lead@example.com' }

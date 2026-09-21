@@ -4,7 +4,6 @@
   "entrypoint": "browser",
   "submissions": 2,
   "request": {
-    "token": "fixture-token",
     "source_platform": "gtm",
     "provider": "gtm",
     "action_source": "browser",

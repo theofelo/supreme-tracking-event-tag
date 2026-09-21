@@ -16,7 +16,6 @@ Official GTM Template for **SupremeTracking.io**. This tag acts as the central e
 
 ### 1. General Settings
 * **Tracking Domain**: Enter the domain where your Supreme Tracking node is installed (e.g., `tracking.yoursite.com`). Do not include `https://` or trailing slashes.
-* **Ingest Token**: The security token defined in your Supreme Tracking `.env` file or database (matches `INGEST_TOKEN`).
 
 ### 2. GA4 Identity (Optional but Recommended)
 * **GA4 Measurement ID**: Enter your GA4 Measurement ID (e.g., `G-XXXXXXXX`).
