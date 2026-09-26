@@ -87,6 +87,16 @@ function runTemplate(data, overrides = {}) {
           };
         case 'getUrl':
           return getUrlImpl;
+        case 'makeNumber':
+          return function (value) {
+            return Number(value);
+          };
+        case 'getType':
+          return function (value) {
+            if (value === null) return 'null';
+            if (Array.isArray(value)) return 'array';
+            return typeof value;
+          };
         default:
           throw new Error('Unmocked require in gtm-harness: ' + name);
       }

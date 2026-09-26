@@ -120,3 +120,153 @@ test('identity cookies and GA4 ids stay uncollected in the template payload', fu
   assert.equal(user.fbc, undefined);
   assert.equal(user.ga_client_id, undefined);
 });
+
+test('lead identity block adds full_name, company, job_title and street2 without disturbing existing fields', function () {
+  const params = templateParameters();
+  const customerInformation = params.find(function (param) { return param.name === 'customerInformation'; });
+  const paramTable1 = customerInformation.subParams.find(function (param) { return param.name === 'paramTable1'; });
+  const userParameterColumn = paramTable1.paramTableColumns[0].param;
+  const values = userParameterColumn.selectItems.map(function (item) { return item.value; });
+
+  assert.deepEqual(values, [
+    'first_name', 'last_name', 'full_name', 'phone', 'email', 'company', 'job_title',
+    'gender', 'date_of_birth', 'street', 'street2', 'city', 'state', 'zip', 'country'
+  ]);
+});
+
+test('leadBlock is scoped to eventName lead and ecommerceBlock stays byte-identical', function () {
+  const params = templateParameters();
+  const leadBlock = params.find(function (param) { return param.name === 'leadBlock'; });
+
+  assert.deepEqual(leadBlock.enablingConditions, [
+    { paramName: 'eventName', paramValue: 'lead', type: 'EQUALS' }
+  ]);
+
+  const subParamNames = leadBlock.subParams.map(function (param) { return param.name; });
+  assert.deepEqual(subParamNames, [
+    'leadStatus', 'leadSource', 'sourceLeadId', 'leadValue', 'leadCurrency', 'customFieldsTable'
+  ]);
+  leadBlock.subParams.forEach(function (param) {
+    assert.equal(param.valueValidators, undefined);
+  });
+
+  const ecommerceBlock = params.find(function (param) { return param.name === 'ecommerceBlock'; });
+  assert.deepEqual(ecommerceBlock, {
+    type: 'GROUP',
+    name: 'ecommerceBlock',
+    displayName: '',
+    groupStyle: 'NO_ZIPPY',
+    subParams: [
+      {
+        type: 'TEXT',
+        name: 'currency',
+        displayName: 'Currency',
+        simpleValueType: true,
+        valueHint: 'BRL',
+        valueValidators: [{ type: 'NON_EMPTY' }]
+      },
+      {
+        type: 'TEXT',
+        name: 'value',
+        displayName: 'Value',
+        simpleValueType: true,
+        valueHint: '97.54',
+        valueValidators: [{ type: 'NON_EMPTY' }]
+      },
+      {
+        type: 'SIMPLE_TABLE',
+        name: 'itemsTable',
+        displayName: 'Items',
+        simpleTableColumns: [
+          { defaultValue: '', displayName: 'Item ID', name: 'item_id', type: 'TEXT' },
+          { defaultValue: '', displayName: 'Item Name', name: 'item_name', type: 'TEXT' },
+          {
+            defaultValue: '',
+            displayName: 'Price',
+            name: 'price',
+            type: 'TEXT',
+            valueValidators: [{ type: 'NON_EMPTY' }]
+          },
+          {
+            defaultValue: 1,
+            displayName: 'Quantity',
+            name: 'quantity',
+            type: 'TEXT',
+            valueValidators: [{ type: 'POSITIVE_NUMBER' }]
+          }
+        ]
+      }
+    ],
+    enablingConditions: [
+      { paramName: 'eventName', paramValue: 'initiate_checkout', type: 'EQUALS' },
+      { paramName: 'eventName', paramValue: 'purchase', type: 'EQUALS' },
+      { paramName: 'eventName', paramValue: 'add_to_cart', type: 'EQUALS' },
+      { paramName: 'eventName', paramValue: 'view_item', type: 'EQUALS' }
+    ]
+  });
+});
+
+test('a lead with identity and the lead block produces a typed params.lead', function () {
+  const result = runTemplate({
+    eventName: 'lead',
+    paramTable1: [
+      { userParameter: 'email', userParameterValue: 'lead@example.com' }
+    ],
+    leadStatus: 'qualified',
+    leadSource: 'landing-page',
+    sourceLeadId: 'form-2026-0001',
+    leadValue: '150.5',
+    leadCurrency: 'BRL',
+    customFieldsTable: [
+      { fieldKey: 'plan_interest', fieldValue: 'pro' },
+      { fieldKey: 'employees', fieldValue: '12' },
+      { fieldKey: 'newsletter', fieldValue: 'true' }
+    ]
+  });
+
+  const params = result.supremeConfig.payload.events[0].data.params;
+  assert.equal(params.value, 150.5);
+  assert.equal(params.currency, 'BRL');
+  assert.deepEqual(params.lead, {
+    status: 'qualified',
+    source: 'landing-page',
+    source_lead_id: 'form-2026-0001',
+    custom_fields: {
+      plan_interest: 'pro',
+      employees: 12,
+      newsletter: true
+    }
+  });
+});
+
+test('a lead with only identity and no lead-block fields omits params.lead', function () {
+  const result = runTemplate({
+    eventName: 'lead',
+    paramTable1: [
+      { userParameter: 'email', userParameterValue: 'lead@example.com' }
+    ]
+  });
+
+  const params = result.supremeConfig.payload.events[0].data.params;
+  assert.equal(Object.prototype.hasOwnProperty.call(params, 'lead'), false);
+});
+
+test('lead-only fields never leak into a purchase payload', function () {
+  const purchaseInput = {
+    eventName: 'purchase',
+    eventId: 'evt_purchase_1',
+    currency: 'USD',
+    value: '10.00'
+  };
+  const base = runTemplate(purchaseInput);
+  const withLeadFields = runTemplate(Object.assign({}, purchaseInput, {
+    leadStatus: 'qualified',
+    leadSource: 'landing-page',
+    sourceLeadId: 'form-2026-0001',
+    leadValue: '150.5',
+    leadCurrency: 'BRL',
+    customFieldsTable: [{ fieldKey: 'plan_interest', fieldValue: 'pro' }]
+  }));
+
+  assert.deepEqual(withLeadFields.supremeConfig, base.supremeConfig);
+});

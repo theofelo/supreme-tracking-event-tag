@@ -145,12 +145,24 @@ ___TEMPLATE_PARAMETERS___
                   "displayValue": "Last Name"
                 },
                 {
+                  "value": "full_name",
+                  "displayValue": "Full Name"
+                },
+                {
                   "value": "phone",
                   "displayValue": "Phone"
                 },
                 {
                   "value": "email",
                   "displayValue": "Email"
+                },
+                {
+                  "value": "company",
+                  "displayValue": "Company"
+                },
+                {
+                  "value": "job_title",
+                  "displayValue": "Job Title"
                 },
                 {
                   "value": "gender",
@@ -163,6 +175,10 @@ ___TEMPLATE_PARAMETERS___
                 {
                   "value": "street",
                   "displayValue": "Street Address"
+                },
+                {
+                  "value": "street2",
+                  "displayValue": "Street Address 2"
                 },
                 {
                   "value": "city",
@@ -237,6 +253,112 @@ ___TEMPLATE_PARAMETERS___
             "isUnique": false
           }
         ]
+      }
+    ]
+  },
+  {
+    "type": "GROUP",
+    "name": "leadBlock",
+    "displayName": "Lead",
+    "groupStyle": "ZIPPY_OPEN",
+    "subParams": [
+      {
+        "type": "SELECT",
+        "name": "leadStatus",
+        "displayName": "Lead Status",
+        "macrosInSelect": true,
+        "selectItems": [
+          {
+            "value": "",
+            "displayValue": "(not set)"
+          },
+          {
+            "value": "new",
+            "displayValue": "new"
+          },
+          {
+            "value": "contacted",
+            "displayValue": "contacted"
+          },
+          {
+            "value": "qualified",
+            "displayValue": "qualified"
+          },
+          {
+            "value": "won",
+            "displayValue": "won"
+          },
+          {
+            "value": "lost",
+            "displayValue": "lost"
+          }
+        ],
+        "simpleValueType": true,
+        "defaultValue": ""
+      },
+      {
+        "type": "TEXT",
+        "name": "leadSource",
+        "displayName": "Lead Source",
+        "simpleValueType": true,
+        "valueHint": "landing-page",
+        "help": "Lowercase letters, digits, _ . - (up to 64). Leave blank and the Node uses \"website\"."
+      },
+      {
+        "type": "TEXT",
+        "name": "sourceLeadId",
+        "displayName": "Source Lead ID",
+        "simpleValueType": true,
+        "help": "Your own system's id for this lead (up to 191 characters). It is a reference only, never a person identifier."
+      },
+      {
+        "type": "TEXT",
+        "name": "leadValue",
+        "displayName": "Lead Value",
+        "simpleValueType": true,
+        "valueHint": "150.5",
+        "help": "Number with a dot as decimal separator. Requires Lead Currency."
+      },
+      {
+        "type": "TEXT",
+        "name": "leadCurrency",
+        "displayName": "Lead Currency",
+        "simpleValueType": true,
+        "valueHint": "BRL",
+        "help": "ISO-4217 code, three uppercase letters."
+      },
+      {
+        "type": "PARAM_TABLE",
+        "name": "customFieldsTable",
+        "displayName": "Custom Fields",
+        "paramTableColumns": [
+          {
+            "param": {
+              "type": "TEXT",
+              "name": "fieldKey",
+              "displayName": "Key",
+              "simpleValueType": true
+            },
+            "isUnique": true
+          },
+          {
+            "param": {
+              "type": "TEXT",
+              "name": "fieldValue",
+              "displayName": "Value",
+              "simpleValueType": true
+            },
+            "isUnique": false
+          }
+        ],
+        "help": "Keys: lowercase letters, digits and _, starting with a letter (up to 64, at most 50 keys). true/false become booleans, plain numbers become numbers, everything else stays text."
+      }
+    ],
+    "enablingConditions": [
+      {
+        "paramName": "eventName",
+        "paramValue": "lead",
+        "type": "EQUALS"
       }
     ]
   },
@@ -346,6 +468,8 @@ const generateRandom = require('generateRandom');
 const copyFromWindow = require('copyFromWindow');
 const callInWindow = require('callInWindow');
 const getUrl = require('getUrl');
+const makeNumber = require('makeNumber');
+const getType = require('getType');
 
 // --- CONFIG ---
 
@@ -396,6 +520,68 @@ if (data.itemsTable && data.itemsTable.length) {
       price: item.price,
       quantity: item.quantity
   }));
+}
+
+// --- LEAD ---
+const isNumericString = value => {
+  if (typeof value !== 'string' || value.length === 0) return false;
+  let i = 0;
+  if (value.charCodeAt(0) === 45) i = 1;
+  if (i >= value.length) return false;
+  const intStart = i;
+  if (value.charCodeAt(i) === 48) {
+    i += 1;
+  } else if (value.charCodeAt(i) >= 49 && value.charCodeAt(i) <= 57) {
+    while (i < value.length && value.charCodeAt(i) >= 48 && value.charCodeAt(i) <= 57) i += 1;
+  } else {
+    return false;
+  }
+  if (i === intStart) return false;
+  if (i < value.length) {
+    if (value.charCodeAt(i) !== 46) return false;
+    i += 1;
+    const fracStart = i;
+    while (i < value.length && value.charCodeAt(i) >= 48 && value.charCodeAt(i) <= 57) i += 1;
+    if (i === fracStart) return false;
+  }
+  return i === value.length;
+};
+
+const typeCustomFieldValue = value => {
+  const valueType = getType(value);
+  if (valueType === 'undefined' || (valueType === 'string' && value === '')) return undefined;
+  if (valueType === 'null') return null;
+  if (valueType === 'string') {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    if (isNumericString(value)) return makeNumber(value);
+    return value;
+  }
+  return value;
+};
+
+if (eventName === 'lead') {
+  if (data.leadValue) eventParams.value = data.leadValue;
+  if (data.leadCurrency) eventParams.currency = data.leadCurrency;
+  if (isNumericString(eventParams.value)) eventParams.value = makeNumber(eventParams.value);
+
+  const lead = {};
+  if (data.leadStatus) lead.status = data.leadStatus;
+  if (data.leadSource) lead.source = data.leadSource;
+  if (data.sourceLeadId) lead.source_lead_id = String(data.sourceLeadId);
+
+  const customFields = {};
+  if (data.customFieldsTable) {
+    data.customFieldsTable.forEach(row => {
+      if (!row.fieldKey) return;
+      const typedValue = typeCustomFieldValue(row.fieldValue);
+      if (typedValue === undefined) return;
+      customFields[row.fieldKey] = typedValue;
+    });
+  }
+  if (Object.keys(customFields).length > 0) lead.custom_fields = customFields;
+
+  if (Object.keys(lead).length > 0) eventParams.lead = lead;
 }
 
 // --- EVENT ID ---
@@ -758,6 +944,46 @@ scenarios:
       assertThat(supremeConfig.payload.gads_conversion).isEqualTo(undefined);
       assertThat(supremeConfig.payload.events[0].id).isEqualTo('evt_test_1');
 
+  - name: Lead block with typed custom fields
+    code: |-
+      let supremeConfig = null;
+
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+      });
+      mock('copyFromWindow', (key) => key === 'supremeSend');
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 987654321);
+      mock('getTimestampMillis', () => 1700000000010);
+
+      runCode({
+        eventName: 'lead',
+        paramTable1: [
+          { userParameter: 'email', userParameterValue: 'lead@example.com' }
+        ],
+        leadStatus: 'qualified',
+        leadSource: 'landing-page',
+        sourceLeadId: 'form-2026-0001',
+        leadValue: '150.5',
+        leadCurrency: 'BRL',
+        customFieldsTable: [
+          { fieldKey: 'plan_interest', fieldValue: 'pro' },
+          { fieldKey: 'employees', fieldValue: '12' },
+          { fieldKey: 'newsletter', fieldValue: 'true' }
+        ],
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      const params = supremeConfig.payload.events[0].data.params;
+      assertThat(params.value).isEqualTo(150.5);
+      assertThat(params.currency).isEqualTo('BRL');
+      assertThat(params.lead.status).isEqualTo('qualified');
+      assertThat(params.lead.source).isEqualTo('landing-page');
+      assertThat(params.lead.source_lead_id).isEqualTo('form-2026-0001');
+      assertThat(params.lead.custom_fields.plan_interest).isEqualTo('pro');
+      assertThat(params.lead.custom_fields.employees).isEqualTo(12);
+      assertThat(params.lead.custom_fields.newsletter).isEqualTo(true);
 
 ___NOTES___
 
