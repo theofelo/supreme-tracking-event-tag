@@ -97,6 +97,8 @@ function runTemplate(data, overrides = {}) {
             if (Array.isArray(value)) return 'array';
             return typeof value;
           };
+        case 'JSON':
+          return JSON;
         default:
           throw new Error('Unmocked require in gtm-harness: ' + name);
       }

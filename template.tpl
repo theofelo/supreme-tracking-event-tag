@@ -470,6 +470,7 @@ const callInWindow = require('callInWindow');
 const getUrl = require('getUrl');
 const makeNumber = require('makeNumber');
 const getType = require('getType');
+const JSON = require('JSON');
 
 // --- CONFIG ---
 
@@ -586,6 +587,168 @@ if (eventName === 'lead') {
 
 // --- EVENT ID ---
 const finalEventId = data.eventId || generateUUID();
+
+// --- LEAD VALIDATION ---
+const VALID_LEAD_STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost'];
+const RESERVED_CUSTOM_FIELD_KEYS = [
+  'email', 'phone', 'first_name', 'last_name', 'full_name', 'company',
+  'job_title', 'street', 'street2', 'city', 'state', 'zip', 'country', 'gender', 'birth_date', 'external_id',
+  'lead_source', 'ip_address', 'user_agent', 'lead_id', 'status', 'source', 'source_lead_id', 'value', 'currency',
+  'property_id', 'stuid', 'event_id', 'event_name', 'event_time', 'channel', 'action_source', 'provider',
+  'source_platform', 'metadata', 'context', 'user', 'params', 'attribution', 'utm_source', 'utm_medium',
+  'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'gbraid', 'wbraid', 'gad_source', 'fbclid', 'fbc', 'fbp',
+  'msclkid', 'ttclid', 'rdt_cid', 'srsltid', 'ga_client_id', 'ga_session_id', 'ctwa_clid', 'delivery',
+  'session_id', 'page_url', 'referrer', 'created_at', 'updated_at', 'first_seen_at', 'last_seen_at',
+  'is_sandbox'
+];
+
+const utf8ByteLength = str => {
+  let bytes = 0;
+  let i = 0;
+  while (i < str.length) {
+    const code = str.charCodeAt(i);
+    if (code < 0x80) {
+      bytes += 1;
+      i += 1;
+    } else if (code < 0x800) {
+      bytes += 2;
+      i += 1;
+    } else if (code >= 0xD800 && code <= 0xDBFF && i + 1 < str.length && str.charCodeAt(i + 1) >= 0xDC00 && str.charCodeAt(i + 1) <= 0xDFFF) {
+      bytes += 4;
+      i += 2;
+    } else {
+      bytes += 3;
+      i += 1;
+    }
+  }
+  return bytes;
+};
+
+const codePointLength = str => {
+  let count = 0;
+  let i = 0;
+  while (i < str.length) {
+    const code = str.charCodeAt(i);
+    if (code >= 0xD800 && code <= 0xDBFF && i + 1 < str.length && str.charCodeAt(i + 1) >= 0xDC00 && str.charCodeAt(i + 1) <= 0xDFFF) {
+      i += 2;
+    } else {
+      i += 1;
+    }
+    count += 1;
+  }
+  return count;
+};
+
+const hasControlChar = str => {
+  for (let i = 0; i < str.length; i += 1) {
+    const code = str.charCodeAt(i);
+    if ((code >= 0x00 && code <= 0x1F) || (code >= 0x7F && code <= 0x9F)) return true;
+  }
+  return false;
+};
+
+const isValidCustomFieldKey = key => {
+  if (typeof key !== 'string' || key.length === 0 || key.length > 64) return false;
+  const first = key.charCodeAt(0);
+  if (first < 0x61 || first > 0x7A) return false;
+  for (let i = 1; i < key.length; i += 1) {
+    const code = key.charCodeAt(i);
+    const isLower = code >= 0x61 && code <= 0x7A;
+    const isDigit = code >= 0x30 && code <= 0x39;
+    const isUnderscore = code === 0x5F;
+    if (!isLower && !isDigit && !isUnderscore) return false;
+  }
+  return true;
+};
+
+const isValidLeadSource = value => {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 64) return false;
+  const first = value.charCodeAt(0);
+  const firstOk = (first >= 0x61 && first <= 0x7A) || (first >= 0x30 && first <= 0x39);
+  if (!firstOk) return false;
+  for (let i = 1; i < value.length; i += 1) {
+    const code = value.charCodeAt(i);
+    const isLower = code >= 0x61 && code <= 0x7A;
+    const isDigit = code >= 0x30 && code <= 0x39;
+    const isAllowedSymbol = code === 0x5F || code === 0x2E || code === 0x2D;
+    if (!isLower && !isDigit && !isAllowedSymbol) return false;
+  }
+  return true;
+};
+
+const isValidCurrencyCode = value => {
+  if (typeof value !== 'string' || value.length !== 3) return false;
+  for (let i = 0; i < 3; i += 1) {
+    const code = value.charCodeAt(i);
+    if (code < 0x41 || code > 0x5A) return false;
+  }
+  return true;
+};
+
+if (eventName === 'lead') {
+  const codes = [];
+
+  const email = typeof userParams.email === 'string' ? userParams.email.trim() : '';
+  const phone = typeof userParams.phone === 'string' ? userParams.phone.trim() : '';
+  if (!email && !phone) codes.push('identity_required');
+
+  if (utf8ByteLength(finalEventId) > 50) codes.push('event_id_too_long');
+
+  const lead = eventParams.lead || {};
+
+  if (lead.status !== undefined && VALID_LEAD_STATUSES.indexOf(lead.status) === -1) {
+    codes.push('lead_status_invalid');
+  }
+  if (lead.source !== undefined && !isValidLeadSource(lead.source)) {
+    codes.push('lead_source_invalid');
+  }
+  if (lead.source_lead_id !== undefined) {
+    const sourceLeadId = lead.source_lead_id;
+    const sourceLeadIdOk = typeof sourceLeadId === 'string' && sourceLeadId.length > 0
+      && codePointLength(sourceLeadId) <= 191 && !hasControlChar(sourceLeadId);
+    if (!sourceLeadIdOk) codes.push('source_lead_id_invalid');
+  }
+
+  const customFields = lead.custom_fields || {};
+  const customFieldKeys = Object.keys(customFields);
+  let hasKeyInvalid = false;
+  let hasKeyReserved = false;
+  let hasValueNotScalar = false;
+  customFieldKeys.forEach(key => {
+    if (!isValidCustomFieldKey(key)) hasKeyInvalid = true;
+    if (RESERVED_CUSTOM_FIELD_KEYS.indexOf(key) !== -1) hasKeyReserved = true;
+    const value = customFields[key];
+    const valueType = getType(value);
+    if (valueType === 'array' || valueType === 'object' || valueType === 'function') {
+      hasValueNotScalar = true;
+    } else if (valueType === 'number' && (value !== value || value === 1 / 0 || value === -1 / 0)) {
+      hasValueNotScalar = true;
+    }
+  });
+  if (hasKeyInvalid) codes.push('custom_field_key_invalid');
+  if (hasKeyReserved) codes.push('custom_field_key_reserved');
+  if (hasValueNotScalar) codes.push('custom_field_value_not_scalar');
+  if (customFieldKeys.length > 50) codes.push('custom_fields_too_many');
+  if (utf8ByteLength(JSON.stringify(customFields)) > 16384) codes.push('custom_fields_too_large');
+
+  if (eventParams.value !== undefined) {
+    const value = eventParams.value;
+    const valueOk = typeof value === 'number' && value >= 0 && value === value && value !== 1 / 0 && value !== -1 / 0;
+    if (!valueOk) codes.push('value_invalid');
+  }
+  if (eventParams.currency !== undefined && !isValidCurrencyCode(eventParams.currency)) {
+    codes.push('currency_invalid');
+  }
+  if (eventParams.value !== undefined && eventParams.currency === undefined) {
+    codes.push('currency_required');
+  }
+
+  if (codes.length > 0) {
+    log('Supreme Tracking: lead refused — ' + codes.join(', '));
+    data.gtmOnFailure();
+    return;
+  }
+}
 
 // --- SEND ---
 const payload = {
@@ -879,6 +1042,9 @@ scenarios:
 
       runCode({
         eventName: 'lead',
+        paramTable1: [
+          { userParameter: 'email', userParameterValue: 'lead@example.com' }
+        ],
         gtmOnSuccess: () => {},
         gtmOnFailure: () => {}
       });
@@ -904,7 +1070,8 @@ scenarios:
       runCode({
         eventName: 'lead',
         paramTable1: [
-          { userParameter: 'date_of_birth', userParameterValue: '1990-01-02' }
+          { userParameter: 'date_of_birth', userParameterValue: '1990-01-02' },
+          { userParameter: 'email', userParameterValue: 'lead@example.com' }
         ],
         gtmOnSuccess: () => {},
         gtmOnFailure: () => {}
@@ -984,6 +1151,29 @@ scenarios:
       assertThat(params.lead.custom_fields.plan_interest).isEqualTo('pro');
       assertThat(params.lead.custom_fields.employees).isEqualTo(12);
       assertThat(params.lead.custom_fields.newsletter).isEqualTo(true);
+
+  - name: A lead without email or phone is refused before supremeSend is called
+    code: |-
+      let dispatched = false;
+      let failed = false;
+
+      mock('callInWindow', () => { dispatched = true; });
+      mock('copyFromWindow', (key) => key === 'supremeSend');
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 864297531);
+      mock('getTimestampMillis', () => 1700000000011);
+
+      runCode({
+        eventName: 'lead',
+        paramTable1: [
+          { userParameter: 'first_name', userParameterValue: 'Maria' }
+        ],
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => { failed = true; }
+      });
+
+      assertThat(dispatched).isEqualTo(false);
+      assertThat(failed).isEqualTo(true);
 
 ___NOTES___
 
