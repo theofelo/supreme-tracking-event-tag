@@ -5,6 +5,31 @@ const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..', '..');
 const TEMPLATE_PATH = path.join(ROOT, 'template.tpl');
 
+const GTM_STRING_METHODS = [
+  'charAt', 'concat', 'indexOf', 'lastIndexOf', 'match', 'replace', 'search', 'slice', 'split',
+  'substring', 'toLowerCase', 'toLocaleLowerCase', 'toString', 'toUpperCase', 'toLocaleUpperCase', 'trim'
+];
+const GTM_ARRAY_METHODS = [
+  'concat', 'every', 'filter', 'forEach', 'indexOf', 'join', 'lastIndexOf', 'map', 'pop', 'push', 'reduce',
+  'reduceRight', 'reverse', 'shift', 'slice', 'some', 'sort', 'splice', 'toString', 'unshift'
+];
+const GTM_ABSENT_GLOBALS = [
+  'Object', 'String', 'Number', 'Boolean', 'Array', 'Math', 'JSON', 'Date', 'RegExp', 'Symbol', 'Map', 'Set',
+  'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'encodeURI', 'encodeURIComponent', 'decodeURI', 'decodeURIComponent'
+];
+const GTM_SANDBOX_PRELUDE = '(function (stringOk, arrayOk, absent) {'
+  + ' var sp = "".constructor.prototype; var ap = [].constructor.prototype;'
+  + ' Object.getOwnPropertyNames(sp).forEach(function (k) { if (k !== "constructor" && k !== "length" && k !== "valueOf" && stringOk.indexOf(k) === -1) delete sp[k]; });'
+  + ' Object.getOwnPropertyNames(ap).forEach(function (k) { if (k !== "constructor" && k !== "length" && arrayOk.indexOf(k) === -1) delete ap[k]; });'
+  + ' absent.forEach(function (name) { globalThis[name] = undefined; });'
+  + ' })';
+
+function createGtmContext(sandbox) {
+  const context = vm.createContext(sandbox);
+  vm.runInContext(GTM_SANDBOX_PRELUDE, context)(GTM_STRING_METHODS, GTM_ARRAY_METHODS, GTM_ABSENT_GLOBALS);
+  return context;
+}
+
 function readTemplateSource() {
   return fs.readFileSync(TEMPLATE_PATH, 'utf8');
 }
@@ -99,13 +124,27 @@ function runTemplate(data, overrides = {}) {
           };
         case 'JSON':
           return JSON;
+        case 'makeString':
+          return function (value) {
+            return String(value);
+          };
+        case 'Object':
+          return {
+            keys: Object.keys,
+            values: Object.values,
+            entries: Object.entries,
+            freeze: Object.freeze,
+            delete: function (target, key) {
+              return delete target[key];
+            }
+          };
         default:
           throw new Error('Unmocked require in gtm-harness: ' + name);
       }
     }
   };
 
-  const context = vm.createContext(sandbox);
+  const context = createGtmContext(sandbox);
   const wrapped = '(function () {\n' + sandboxedJsSource() + '\n})();';
   vm.runInContext(wrapped, context, { filename: TEMPLATE_PATH });
 
@@ -124,5 +163,6 @@ module.exports = {
   templateParameters,
   webPermissions,
   sandboxedJsSource,
-  runTemplate
+  runTemplate,
+  createGtmContext
 };

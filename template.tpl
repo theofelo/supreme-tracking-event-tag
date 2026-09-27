@@ -469,8 +469,10 @@ const copyFromWindow = require('copyFromWindow');
 const callInWindow = require('callInWindow');
 const getUrl = require('getUrl');
 const makeNumber = require('makeNumber');
+const makeString = require('makeString');
 const getType = require('getType');
 const JSON = require('JSON');
+const Object = require('Object');
 
 // --- CONFIG ---
 
@@ -524,25 +526,27 @@ if (data.itemsTable && data.itemsTable.length) {
 }
 
 // --- LEAD ---
+const isDigit = c => c >= '0' && c <= '9';
+const isLower = c => c >= 'a' && c <= 'z';
+const isPresent = value => getType(value) !== 'undefined' && getType(value) !== 'null';
+
 const isNumericString = value => {
-  if (typeof value !== 'string' || value.length === 0) return false;
+  if (getType(value) !== 'string' || value.length === 0) return false;
   let i = 0;
-  if (value.charCodeAt(0) === 45) i = 1;
+  if (value.charAt(0) === '-') i = 1;
   if (i >= value.length) return false;
-  const intStart = i;
-  if (value.charCodeAt(i) === 48) {
+  if (value.charAt(i) === '0') {
     i += 1;
-  } else if (value.charCodeAt(i) >= 49 && value.charCodeAt(i) <= 57) {
-    while (i < value.length && value.charCodeAt(i) >= 48 && value.charCodeAt(i) <= 57) i += 1;
+  } else if (value.charAt(i) >= '1' && value.charAt(i) <= '9') {
+    while (i < value.length && isDigit(value.charAt(i))) i += 1;
   } else {
     return false;
   }
-  if (i === intStart) return false;
   if (i < value.length) {
-    if (value.charCodeAt(i) !== 46) return false;
+    if (value.charAt(i) !== '.') return false;
     i += 1;
     const fracStart = i;
-    while (i < value.length && value.charCodeAt(i) >= 48 && value.charCodeAt(i) <= 57) i += 1;
+    while (i < value.length && isDigit(value.charAt(i))) i += 1;
     if (i === fracStart) return false;
   }
   return i === value.length;
@@ -569,7 +573,7 @@ if (eventName === 'lead') {
   const lead = {};
   if (data.leadStatus) lead.status = data.leadStatus;
   if (data.leadSource) lead.source = data.leadSource;
-  if (data.sourceLeadId) lead.source_lead_id = String(data.sourceLeadId);
+  if (data.sourceLeadId) lead.source_lead_id = makeString(data.sourceLeadId);
 
   const customFields = {};
   if (data.customFieldsTable) {
@@ -602,18 +606,21 @@ const RESERVED_CUSTOM_FIELD_KEYS = [
   'is_sandbox'
 ];
 
+const isHighSurrogate = c => c >= '\uD800' && c <= '\uDBFF';
+const isLowSurrogate = c => c >= '\uDC00' && c <= '\uDFFF';
+
 const utf8ByteLength = str => {
   let bytes = 0;
   let i = 0;
   while (i < str.length) {
-    const code = str.charCodeAt(i);
-    if (code < 0x80) {
+    const c = str.charAt(i);
+    if (c < '\u0080') {
       bytes += 1;
       i += 1;
-    } else if (code < 0x800) {
+    } else if (c < '\u0800') {
       bytes += 2;
       i += 1;
-    } else if (code >= 0xD800 && code <= 0xDBFF && i + 1 < str.length && str.charCodeAt(i + 1) >= 0xDC00 && str.charCodeAt(i + 1) <= 0xDFFF) {
+    } else if (isHighSurrogate(c) && i + 1 < str.length && isLowSurrogate(str.charAt(i + 1))) {
       bytes += 4;
       i += 2;
     } else {
@@ -628,8 +635,7 @@ const codePointLength = str => {
   let count = 0;
   let i = 0;
   while (i < str.length) {
-    const code = str.charCodeAt(i);
-    if (code >= 0xD800 && code <= 0xDBFF && i + 1 < str.length && str.charCodeAt(i + 1) >= 0xDC00 && str.charCodeAt(i + 1) <= 0xDFFF) {
+    if (isHighSurrogate(str.charAt(i)) && i + 1 < str.length && isLowSurrogate(str.charAt(i + 1))) {
       i += 2;
     } else {
       i += 1;
@@ -641,46 +647,37 @@ const codePointLength = str => {
 
 const hasControlChar = str => {
   for (let i = 0; i < str.length; i += 1) {
-    const code = str.charCodeAt(i);
-    if ((code >= 0x00 && code <= 0x1F) || (code >= 0x7F && code <= 0x9F)) return true;
+    const c = str.charAt(i);
+    if (c <= '\u001F' || (c >= '\u007F' && c <= '\u009F')) return true;
   }
   return false;
 };
 
 const isValidCustomFieldKey = key => {
-  if (typeof key !== 'string' || key.length === 0 || key.length > 64) return false;
-  const first = key.charCodeAt(0);
-  if (first < 0x61 || first > 0x7A) return false;
+  if (getType(key) !== 'string' || key.length === 0 || key.length > 64) return false;
+  if (!isLower(key.charAt(0))) return false;
   for (let i = 1; i < key.length; i += 1) {
-    const code = key.charCodeAt(i);
-    const isLower = code >= 0x61 && code <= 0x7A;
-    const isDigit = code >= 0x30 && code <= 0x39;
-    const isUnderscore = code === 0x5F;
-    if (!isLower && !isDigit && !isUnderscore) return false;
+    const c = key.charAt(i);
+    if (!isLower(c) && !isDigit(c) && c !== '_') return false;
   }
   return true;
 };
 
 const isValidLeadSource = value => {
-  if (typeof value !== 'string' || value.length === 0 || value.length > 64) return false;
-  const first = value.charCodeAt(0);
-  const firstOk = (first >= 0x61 && first <= 0x7A) || (first >= 0x30 && first <= 0x39);
-  if (!firstOk) return false;
+  if (getType(value) !== 'string' || value.length === 0 || value.length > 64) return false;
+  if (!isLower(value.charAt(0)) && !isDigit(value.charAt(0))) return false;
   for (let i = 1; i < value.length; i += 1) {
-    const code = value.charCodeAt(i);
-    const isLower = code >= 0x61 && code <= 0x7A;
-    const isDigit = code >= 0x30 && code <= 0x39;
-    const isAllowedSymbol = code === 0x5F || code === 0x2E || code === 0x2D;
-    if (!isLower && !isDigit && !isAllowedSymbol) return false;
+    const c = value.charAt(i);
+    if (!isLower(c) && !isDigit(c) && c !== '_' && c !== '.' && c !== '-') return false;
   }
   return true;
 };
 
 const isValidCurrencyCode = value => {
-  if (typeof value !== 'string' || value.length !== 3) return false;
+  if (getType(value) !== 'string' || value.length !== 3) return false;
   for (let i = 0; i < 3; i += 1) {
-    const code = value.charCodeAt(i);
-    if (code < 0x41 || code > 0x5A) return false;
+    const c = value.charAt(i);
+    if (c < 'A' || c > 'Z') return false;
   }
   return true;
 };
@@ -688,28 +685,32 @@ const isValidCurrencyCode = value => {
 if (eventName === 'lead') {
   const codes = [];
 
-  const email = typeof userParams.email === 'string' ? userParams.email.trim() : '';
-  const phone = typeof userParams.phone === 'string' ? userParams.phone.trim() : '';
+  const email = getType(userParams.email) === 'string' ? userParams.email.trim() : '';
+  const phone = getType(userParams.phone) === 'string' ? userParams.phone.trim() : '';
   if (!email && !phone) codes.push('identity_required');
 
-  if (utf8ByteLength(finalEventId) > 50) codes.push('event_id_too_long');
+  if (utf8ByteLength(makeString(finalEventId)) > 50) codes.push('event_id_too_long');
 
-  const lead = eventParams.lead || {};
+  const leadBlockType = getType(eventParams.lead);
+  if (isPresent(eventParams.lead) && leadBlockType !== 'object') codes.push('lead_block_not_object');
+  const lead = leadBlockType === 'object' ? eventParams.lead : {};
 
-  if (lead.status !== undefined && VALID_LEAD_STATUSES.indexOf(lead.status) === -1) {
+  if (isPresent(lead.status) && VALID_LEAD_STATUSES.indexOf(lead.status) === -1) {
     codes.push('lead_status_invalid');
   }
-  if (lead.source !== undefined && !isValidLeadSource(lead.source)) {
+  if (isPresent(lead.source) && !isValidLeadSource(lead.source)) {
     codes.push('lead_source_invalid');
   }
-  if (lead.source_lead_id !== undefined) {
+  if (isPresent(lead.source_lead_id)) {
     const sourceLeadId = lead.source_lead_id;
-    const sourceLeadIdOk = typeof sourceLeadId === 'string' && sourceLeadId.length > 0
+    const sourceLeadIdOk = getType(sourceLeadId) === 'string' && sourceLeadId.length > 0
       && codePointLength(sourceLeadId) <= 191 && !hasControlChar(sourceLeadId);
     if (!sourceLeadIdOk) codes.push('source_lead_id_invalid');
   }
 
-  const customFields = lead.custom_fields || {};
+  const customFieldsType = getType(lead.custom_fields);
+  if (isPresent(lead.custom_fields) && customFieldsType !== 'object') codes.push('custom_fields_not_object');
+  const customFields = customFieldsType === 'object' ? lead.custom_fields : {};
   const customFieldKeys = Object.keys(customFields);
   let hasKeyInvalid = false;
   let hasKeyReserved = false;
@@ -731,15 +732,15 @@ if (eventName === 'lead') {
   if (customFieldKeys.length > 50) codes.push('custom_fields_too_many');
   if (utf8ByteLength(JSON.stringify(customFields)) > 16384) codes.push('custom_fields_too_large');
 
-  if (eventParams.value !== undefined) {
+  if (isPresent(eventParams.value)) {
     const value = eventParams.value;
-    const valueOk = typeof value === 'number' && value >= 0 && value === value && value !== 1 / 0 && value !== -1 / 0;
+    const valueOk = getType(value) === 'number' && value >= 0 && value === value && value !== 1 / 0 && value !== -1 / 0;
     if (!valueOk) codes.push('value_invalid');
   }
-  if (eventParams.currency !== undefined && !isValidCurrencyCode(eventParams.currency)) {
+  if (isPresent(eventParams.currency) && !isValidCurrencyCode(eventParams.currency)) {
     codes.push('currency_invalid');
   }
-  if (eventParams.value !== undefined && eventParams.currency === undefined) {
+  if (isPresent(eventParams.value) && !isPresent(eventParams.currency)) {
     codes.push('currency_required');
   }
 
@@ -1167,6 +1168,32 @@ scenarios:
         eventName: 'lead',
         paramTable1: [
           { userParameter: 'first_name', userParameterValue: 'Maria' }
+        ],
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => { failed = true; }
+      });
+
+      assertThat(dispatched).isEqualTo(false);
+      assertThat(failed).isEqualTo(true);
+
+  - name: A lead whose Custom Parameter named lead is not an object is refused
+    code: |-
+      let dispatched = false;
+      let failed = false;
+
+      mock('callInWindow', () => { dispatched = true; });
+      mock('copyFromWindow', (key) => key === 'supremeSend');
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 975318642);
+      mock('getTimestampMillis', () => 1700000000012);
+
+      runCode({
+        eventName: 'lead',
+        paramTable1: [
+          { userParameter: 'email', userParameterValue: 'lead@example.com' }
+        ],
+        paramTable2: [
+          { text1: 'lead', text2: 'x' }
         ],
         gtmOnSuccess: () => {},
         gtmOnFailure: () => { failed = true; }

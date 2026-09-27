@@ -3,8 +3,9 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const { spawnSync } = require('node:child_process');
-const { templateParameters, webPermissions, runTemplate } = require('./gtm-harness');
+const { templateParameters, webPermissions, runTemplate, sandboxedJsSource, createGtmContext } = require('./gtm-harness');
 
 const CANONICAL_GTM_LEAD_JSON = '{"action_source":"browser","context":{"page":{"url":"https://example.com/contato"},"timestamp_ms":1790000000000,"user":{"company":"Acme Ltda","email":"Maria.Silva@Example.com","first_name":"Maria","job_title":"Diretora","last_name":"Silva","phone":"+55 (11) 98765-4321"}},"events":[{"data":{"_delivery":{"mode":"supreme_send","source":"gtm_event_tag"},"params":{"currency":"BRL","lead":{"custom_fields":{"employees":12,"newsletter":true,"notes":"Olá, \\"quero\\" demo amanhã","plan_interest":"pro"},"source":"landing-page","source_lead_id":"form-2026-0001","status":"qualified"},"value":150.5}},"id":"lead-contract-v1-gtm","name":"lead"}],"provider":"gtm","source_platform":"gtm"}';
 const CANONICAL_GTM_LEAD_SHA256 = '8b3caa6eece7c2dda62dddd841f80f3308365cae996e9eb8db6ad13a6d5992b9';
@@ -74,6 +75,18 @@ function assertRefused(result, code) {
 function assertDispatched(result) {
   assert.equal(result.failureCalls, 0);
   assert.notEqual(result.calls.indexOf('supremeSend'), -1);
+}
+
+function leadWithCustomLeadParam(text2) {
+  return {
+    eventName: 'lead',
+    paramTable1: [
+      { userParameter: 'email', userParameterValue: 'lead@example.com' }
+    ],
+    paramTable2: [
+      { text1: 'lead', text2: text2 }
+    ]
+  };
 }
 
 test('page_view is no longer a selectable event choice', function () {
@@ -488,4 +501,48 @@ test('the committed lead-contract-v1 fixture file is canonically identical to th
   const generatorPath = path.join(__dirname, 'generate-lead-contract-v1.js');
   const check = spawnSync(process.execPath, [generatorPath, '--check']);
   assert.equal(check.status, 0, (check.stderr || Buffer.from('')).toString());
+});
+
+test('the sandbox-faithful harness context strips charCodeAt, Object, String and Number, and keeps charAt and trim', function () {
+  const context = createGtmContext({});
+  assert.equal(vm.runInContext('typeof "".charCodeAt', context), 'undefined');
+  assert.equal(vm.runInContext('typeof Object', context), 'undefined');
+  assert.equal(vm.runInContext('typeof String', context), 'undefined');
+  assert.equal(vm.runInContext('typeof Number', context), 'undefined');
+  assert.equal(vm.runInContext('typeof "".charAt', context), 'function');
+  assert.equal(vm.runInContext('typeof "".trim', context), 'function');
+});
+
+test('the shipped sandboxed JS never calls charCodeAt/typeof/String()/Number() and requires Object and makeString', function () {
+  const source = sandboxedJsSource();
+  assert.equal(/\.charCodeAt\(|\btypeof\b|\bString\(|\bNumber\(/.test(source), false);
+  assert.equal(source.indexOf("require('Object')") !== -1, true);
+  assert.equal(source.indexOf("require('makeString')") !== -1, true);
+});
+
+test('a Custom Parameter named lead that is a non-object string is refused with lead_block_not_object', function () {
+  assertRefused(runTemplate(leadWithCustomLeadParam('x')), 'lead_block_not_object');
+});
+
+test('a Custom Parameter named lead that is an array is refused with lead_block_not_object', function () {
+  assertRefused(runTemplate(leadWithCustomLeadParam([1])), 'lead_block_not_object');
+});
+
+test('a Custom Parameter named lead whose custom_fields is a number is refused with custom_fields_not_object', function () {
+  assertRefused(runTemplate(leadWithCustomLeadParam({ custom_fields: 5 })), 'custom_fields_not_object');
+});
+
+test('a Custom Parameter named lead whose custom_fields is a string is refused with custom_fields_not_object, not custom_field_key_invalid', function () {
+  const result = runTemplate(leadWithCustomLeadParam({ custom_fields: 'ab' }));
+  assertRefused(result, 'custom_fields_not_object');
+  const hasKeyInvalid = result.logs.some(function (args) {
+    return args.some(function (arg) {
+      return typeof arg === 'string' && arg.indexOf('custom_field_key_invalid') !== -1;
+    });
+  });
+  assert.equal(hasKeyInvalid, false);
+});
+
+test('a Custom Parameter named lead set to null is read as absent and the lead dispatches', function () {
+  assertDispatched(runTemplate(leadWithCustomLeadParam(null)));
 });
