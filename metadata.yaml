@@ -15,7 +15,7 @@
 homepage: "https://supremetracking.io/"
 documentation: "https://supremetracking.io/documentation/gtm-tag-template-documentation.php"
 versions:
-  - sha: e46055f1678ba20b763a136e99864385eba3c7e4
+  - sha: 4d201ef5c94ba0690e371f6bc640fc8a40d644a4
     changeNotes: Lead tags send the whole Lead (status, source, your own lead id, typed custom fields, value and currency) plus company and job title, and refuse an invalid lead before sending it
   - sha: d1d4c865b29e9e2571ca91aa329c1926ee6e44e9
     changeNotes: The Ingest Token field is gone; the tag no longer asks for a secret the Node never read
