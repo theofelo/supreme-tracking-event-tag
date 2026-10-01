@@ -145,12 +145,24 @@ ___TEMPLATE_PARAMETERS___
                   "displayValue": "Last Name"
                 },
                 {
+                  "value": "full_name",
+                  "displayValue": "Full Name"
+                },
+                {
                   "value": "phone",
                   "displayValue": "Phone"
                 },
                 {
                   "value": "email",
                   "displayValue": "Email"
+                },
+                {
+                  "value": "company",
+                  "displayValue": "Company"
+                },
+                {
+                  "value": "job_title",
+                  "displayValue": "Job Title"
                 },
                 {
                   "value": "gender",
@@ -163,6 +175,10 @@ ___TEMPLATE_PARAMETERS___
                 {
                   "value": "street",
                   "displayValue": "Street Address"
+                },
+                {
+                  "value": "street2",
+                  "displayValue": "Street Address 2"
                 },
                 {
                   "value": "city",
@@ -237,6 +253,112 @@ ___TEMPLATE_PARAMETERS___
             "isUnique": false
           }
         ]
+      }
+    ]
+  },
+  {
+    "type": "GROUP",
+    "name": "leadBlock",
+    "displayName": "Lead",
+    "groupStyle": "ZIPPY_OPEN",
+    "subParams": [
+      {
+        "type": "SELECT",
+        "name": "leadStatus",
+        "displayName": "Lead Status",
+        "macrosInSelect": true,
+        "selectItems": [
+          {
+            "value": "",
+            "displayValue": "(not set)"
+          },
+          {
+            "value": "new",
+            "displayValue": "new"
+          },
+          {
+            "value": "contacted",
+            "displayValue": "contacted"
+          },
+          {
+            "value": "qualified",
+            "displayValue": "qualified"
+          },
+          {
+            "value": "won",
+            "displayValue": "won"
+          },
+          {
+            "value": "lost",
+            "displayValue": "lost"
+          }
+        ],
+        "simpleValueType": true,
+        "defaultValue": ""
+      },
+      {
+        "type": "TEXT",
+        "name": "leadSource",
+        "displayName": "Lead Source",
+        "simpleValueType": true,
+        "valueHint": "landing-page",
+        "help": "Lowercase letters, digits, _ . - (up to 64). Leave blank and the Node uses \"website\"."
+      },
+      {
+        "type": "TEXT",
+        "name": "sourceLeadId",
+        "displayName": "Source Lead ID",
+        "simpleValueType": true,
+        "help": "Your own system's id for this lead (up to 191 characters). It is a reference only, never a person identifier."
+      },
+      {
+        "type": "TEXT",
+        "name": "leadValue",
+        "displayName": "Lead Value",
+        "simpleValueType": true,
+        "valueHint": "150.5",
+        "help": "Number with a dot as decimal separator. Requires Lead Currency."
+      },
+      {
+        "type": "TEXT",
+        "name": "leadCurrency",
+        "displayName": "Lead Currency",
+        "simpleValueType": true,
+        "valueHint": "BRL",
+        "help": "ISO-4217 code, three uppercase letters."
+      },
+      {
+        "type": "PARAM_TABLE",
+        "name": "customFieldsTable",
+        "displayName": "Custom Fields",
+        "paramTableColumns": [
+          {
+            "param": {
+              "type": "TEXT",
+              "name": "fieldKey",
+              "displayName": "Key",
+              "simpleValueType": true
+            },
+            "isUnique": true
+          },
+          {
+            "param": {
+              "type": "TEXT",
+              "name": "fieldValue",
+              "displayName": "Value",
+              "simpleValueType": true
+            },
+            "isUnique": false
+          }
+        ],
+        "help": "Keys: lowercase letters, digits and _, starting with a letter (up to 64, at most 50 keys). true/false become booleans, plain numbers become numbers, everything else stays text."
+      }
+    ],
+    "enablingConditions": [
+      {
+        "paramName": "eventName",
+        "paramValue": "lead",
+        "type": "EQUALS"
       }
     ]
   },
@@ -346,6 +468,11 @@ const generateRandom = require('generateRandom');
 const copyFromWindow = require('copyFromWindow');
 const callInWindow = require('callInWindow');
 const getUrl = require('getUrl');
+const makeNumber = require('makeNumber');
+const makeString = require('makeString');
+const getType = require('getType');
+const JSON = require('JSON');
+const Object = require('Object');
 
 // --- CONFIG ---
 
@@ -398,8 +525,231 @@ if (data.itemsTable && data.itemsTable.length) {
   }));
 }
 
+// --- LEAD ---
+const isDigit = c => c >= '0' && c <= '9';
+const isLower = c => c >= 'a' && c <= 'z';
+const isPresent = value => getType(value) !== 'undefined' && getType(value) !== 'null';
+
+const isNumericString = value => {
+  if (getType(value) !== 'string' || value.length === 0) return false;
+  let i = 0;
+  if (value.charAt(0) === '-') i = 1;
+  if (i >= value.length) return false;
+  if (value.charAt(i) === '0') {
+    i += 1;
+  } else if (value.charAt(i) >= '1' && value.charAt(i) <= '9') {
+    while (i < value.length && isDigit(value.charAt(i))) i += 1;
+  } else {
+    return false;
+  }
+  if (i < value.length) {
+    if (value.charAt(i) !== '.') return false;
+    i += 1;
+    const fracStart = i;
+    while (i < value.length && isDigit(value.charAt(i))) i += 1;
+    if (i === fracStart) return false;
+  }
+  return i === value.length;
+};
+
+const typeCustomFieldValue = value => {
+  const valueType = getType(value);
+  if (valueType === 'undefined' || (valueType === 'string' && value === '')) return undefined;
+  if (valueType === 'null') return null;
+  if (valueType === 'string') {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    if (isNumericString(value)) return makeNumber(value);
+    return value;
+  }
+  return value;
+};
+
+if (eventName === 'lead') {
+  if (data.leadValue) eventParams.value = data.leadValue;
+  if (data.leadCurrency) eventParams.currency = data.leadCurrency;
+  if (isNumericString(eventParams.value)) eventParams.value = makeNumber(eventParams.value);
+
+  const lead = {};
+  if (data.leadStatus) lead.status = data.leadStatus;
+  if (data.leadSource) lead.source = data.leadSource;
+  if (data.sourceLeadId) lead.source_lead_id = makeString(data.sourceLeadId);
+
+  const customFields = {};
+  if (data.customFieldsTable) {
+    data.customFieldsTable.forEach(row => {
+      if (!row.fieldKey) return;
+      const typedValue = typeCustomFieldValue(row.fieldValue);
+      if (typedValue === undefined) return;
+      customFields[row.fieldKey] = typedValue;
+    });
+  }
+  if (Object.keys(customFields).length > 0) lead.custom_fields = customFields;
+
+  if (Object.keys(lead).length > 0) eventParams.lead = lead;
+}
+
 // --- EVENT ID ---
 const finalEventId = data.eventId || generateUUID();
+
+// --- LEAD VALIDATION ---
+const VALID_LEAD_STATUSES = ['new', 'contacted', 'qualified', 'won', 'lost'];
+const RESERVED_CUSTOM_FIELD_KEYS = [
+  'email', 'phone', 'first_name', 'last_name', 'full_name', 'company',
+  'job_title', 'street', 'street2', 'city', 'state', 'zip', 'country', 'gender', 'birth_date', 'external_id',
+  'lead_source', 'ip_address', 'user_agent', 'lead_id', 'status', 'source', 'source_lead_id', 'value', 'currency',
+  'property_id', 'stuid', 'event_id', 'event_name', 'event_time', 'channel', 'action_source', 'provider',
+  'source_platform', 'metadata', 'context', 'user', 'params', 'attribution', 'utm_source', 'utm_medium',
+  'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'gbraid', 'wbraid', 'gad_source', 'fbclid', 'fbc', 'fbp',
+  'msclkid', 'ttclid', 'rdt_cid', 'srsltid', 'ga_client_id', 'ga_session_id', 'ctwa_clid', 'delivery',
+  'session_id', 'page_url', 'referrer', 'created_at', 'updated_at', 'first_seen_at', 'last_seen_at',
+  'is_sandbox'
+];
+
+const isHighSurrogate = c => c >= '\uD800' && c <= '\uDBFF';
+const isLowSurrogate = c => c >= '\uDC00' && c <= '\uDFFF';
+
+const utf8ByteLength = str => {
+  let bytes = 0;
+  let i = 0;
+  while (i < str.length) {
+    const c = str.charAt(i);
+    if (c < '\u0080') {
+      bytes += 1;
+      i += 1;
+    } else if (c < '\u0800') {
+      bytes += 2;
+      i += 1;
+    } else if (isHighSurrogate(c) && i + 1 < str.length && isLowSurrogate(str.charAt(i + 1))) {
+      bytes += 4;
+      i += 2;
+    } else {
+      bytes += 3;
+      i += 1;
+    }
+  }
+  return bytes;
+};
+
+const codePointLength = str => {
+  let count = 0;
+  let i = 0;
+  while (i < str.length) {
+    if (isHighSurrogate(str.charAt(i)) && i + 1 < str.length && isLowSurrogate(str.charAt(i + 1))) {
+      i += 2;
+    } else {
+      i += 1;
+    }
+    count += 1;
+  }
+  return count;
+};
+
+const hasControlChar = str => {
+  for (let i = 0; i < str.length; i += 1) {
+    const c = str.charAt(i);
+    if (c <= '\u001F' || (c >= '\u007F' && c <= '\u009F')) return true;
+  }
+  return false;
+};
+
+const isValidCustomFieldKey = key => {
+  if (getType(key) !== 'string' || key.length === 0 || key.length > 64) return false;
+  if (!isLower(key.charAt(0))) return false;
+  for (let i = 1; i < key.length; i += 1) {
+    const c = key.charAt(i);
+    if (!isLower(c) && !isDigit(c) && c !== '_') return false;
+  }
+  return true;
+};
+
+const isValidLeadSource = value => {
+  if (getType(value) !== 'string' || value.length === 0 || value.length > 64) return false;
+  if (!isLower(value.charAt(0)) && !isDigit(value.charAt(0))) return false;
+  for (let i = 1; i < value.length; i += 1) {
+    const c = value.charAt(i);
+    if (!isLower(c) && !isDigit(c) && c !== '_' && c !== '.' && c !== '-') return false;
+  }
+  return true;
+};
+
+const isValidCurrencyCode = value => {
+  if (getType(value) !== 'string' || value.length !== 3) return false;
+  for (let i = 0; i < 3; i += 1) {
+    const c = value.charAt(i);
+    if (c < 'A' || c > 'Z') return false;
+  }
+  return true;
+};
+
+if (eventName === 'lead') {
+  const codes = [];
+
+  const email = getType(userParams.email) === 'string' ? userParams.email.trim() : '';
+  const phone = getType(userParams.phone) === 'string' ? userParams.phone.trim() : '';
+  if (!email && !phone) codes.push('identity_required');
+
+  if (utf8ByteLength(makeString(finalEventId)) > 50) codes.push('event_id_too_long');
+
+  const leadBlockType = getType(eventParams.lead);
+  if (isPresent(eventParams.lead) && leadBlockType !== 'object') codes.push('lead_block_not_object');
+  const lead = leadBlockType === 'object' ? eventParams.lead : {};
+
+  if (isPresent(lead.status) && VALID_LEAD_STATUSES.indexOf(lead.status) === -1) {
+    codes.push('lead_status_invalid');
+  }
+  if (isPresent(lead.source) && !isValidLeadSource(lead.source)) {
+    codes.push('lead_source_invalid');
+  }
+  if (isPresent(lead.source_lead_id)) {
+    const sourceLeadId = lead.source_lead_id;
+    const sourceLeadIdOk = getType(sourceLeadId) === 'string' && sourceLeadId.length > 0
+      && codePointLength(sourceLeadId) <= 191 && !hasControlChar(sourceLeadId);
+    if (!sourceLeadIdOk) codes.push('source_lead_id_invalid');
+  }
+
+  const customFieldsType = getType(lead.custom_fields);
+  if (isPresent(lead.custom_fields) && customFieldsType !== 'object') codes.push('custom_fields_not_object');
+  const customFields = customFieldsType === 'object' ? lead.custom_fields : {};
+  const customFieldKeys = Object.keys(customFields);
+  let hasKeyInvalid = false;
+  let hasKeyReserved = false;
+  let hasValueNotScalar = false;
+  customFieldKeys.forEach(key => {
+    if (!isValidCustomFieldKey(key)) hasKeyInvalid = true;
+    if (RESERVED_CUSTOM_FIELD_KEYS.indexOf(key) !== -1) hasKeyReserved = true;
+    const value = customFields[key];
+    const valueType = getType(value);
+    if (valueType === 'array' || valueType === 'object' || valueType === 'function') {
+      hasValueNotScalar = true;
+    } else if (valueType === 'number' && (value !== value || value === 1 / 0 || value === -1 / 0)) {
+      hasValueNotScalar = true;
+    }
+  });
+  if (hasKeyInvalid) codes.push('custom_field_key_invalid');
+  if (hasKeyReserved) codes.push('custom_field_key_reserved');
+  if (hasValueNotScalar) codes.push('custom_field_value_not_scalar');
+  if (customFieldKeys.length > 50) codes.push('custom_fields_too_many');
+  if (utf8ByteLength(JSON.stringify(customFields)) > 16384) codes.push('custom_fields_too_large');
+
+  if (isPresent(eventParams.value)) {
+    const value = eventParams.value;
+    const valueOk = getType(value) === 'number' && value >= 0 && value === value && value !== 1 / 0 && value !== -1 / 0;
+    if (!valueOk) codes.push('value_invalid');
+  }
+  if (isPresent(eventParams.currency) && !isValidCurrencyCode(eventParams.currency)) {
+    codes.push('currency_invalid');
+  }
+  if (isPresent(eventParams.value) && !isPresent(eventParams.currency)) {
+    codes.push('currency_required');
+  }
+
+  if (codes.length > 0) {
+    log('Supreme Tracking: lead refused — ' + codes.join(', '));
+    data.gtmOnFailure();
+    return;
+  }
+}
 
 // --- SEND ---
 const payload = {
@@ -693,6 +1043,9 @@ scenarios:
 
       runCode({
         eventName: 'lead',
+        paramTable1: [
+          { userParameter: 'email', userParameterValue: 'lead@example.com' }
+        ],
         gtmOnSuccess: () => {},
         gtmOnFailure: () => {}
       });
@@ -718,7 +1071,8 @@ scenarios:
       runCode({
         eventName: 'lead',
         paramTable1: [
-          { userParameter: 'date_of_birth', userParameterValue: '1990-01-02' }
+          { userParameter: 'date_of_birth', userParameterValue: '1990-01-02' },
+          { userParameter: 'email', userParameterValue: 'lead@example.com' }
         ],
         gtmOnSuccess: () => {},
         gtmOnFailure: () => {}
@@ -758,6 +1112,95 @@ scenarios:
       assertThat(supremeConfig.payload.gads_conversion).isEqualTo(undefined);
       assertThat(supremeConfig.payload.events[0].id).isEqualTo('evt_test_1');
 
+  - name: Lead block with typed custom fields
+    code: |-
+      let supremeConfig = null;
+
+      mock('callInWindow', (fnName, config) => {
+        if (fnName === 'supremeSend') supremeConfig = config;
+      });
+      mock('copyFromWindow', (key) => key === 'supremeSend');
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 987654321);
+      mock('getTimestampMillis', () => 1700000000010);
+
+      runCode({
+        eventName: 'lead',
+        paramTable1: [
+          { userParameter: 'email', userParameterValue: 'lead@example.com' }
+        ],
+        leadStatus: 'qualified',
+        leadSource: 'landing-page',
+        sourceLeadId: 'form-2026-0001',
+        leadValue: '150.5',
+        leadCurrency: 'BRL',
+        customFieldsTable: [
+          { fieldKey: 'plan_interest', fieldValue: 'pro' },
+          { fieldKey: 'employees', fieldValue: '12' },
+          { fieldKey: 'newsletter', fieldValue: 'true' }
+        ],
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => {}
+      });
+
+      const params = supremeConfig.payload.events[0].data.params;
+      assertThat(params.value).isEqualTo(150.5);
+      assertThat(params.currency).isEqualTo('BRL');
+      assertThat(params.lead.status).isEqualTo('qualified');
+      assertThat(params.lead.source).isEqualTo('landing-page');
+      assertThat(params.lead.source_lead_id).isEqualTo('form-2026-0001');
+      assertThat(params.lead.custom_fields.plan_interest).isEqualTo('pro');
+      assertThat(params.lead.custom_fields.employees).isEqualTo(12);
+      assertThat(params.lead.custom_fields.newsletter).isEqualTo(true);
+
+  - name: A lead without email or phone is refused before supremeSend is called
+    code: |-
+      let dispatched = false;
+      let failed = false;
+
+      mock('callInWindow', () => { dispatched = true; });
+      mock('copyFromWindow', (key) => key === 'supremeSend');
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 864297531);
+      mock('getTimestampMillis', () => 1700000000011);
+
+      runCode({
+        eventName: 'lead',
+        paramTable1: [
+          { userParameter: 'first_name', userParameterValue: 'Maria' }
+        ],
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => { failed = true; }
+      });
+
+      assertThat(dispatched).isEqualTo(false);
+      assertThat(failed).isEqualTo(true);
+
+  - name: A lead whose Custom Parameter named lead is not an object is refused
+    code: |-
+      let dispatched = false;
+      let failed = false;
+
+      mock('callInWindow', () => { dispatched = true; });
+      mock('copyFromWindow', (key) => key === 'supremeSend');
+      mock('getUrl', () => 'https://example.com/');
+      mock('generateRandom', () => 975318642);
+      mock('getTimestampMillis', () => 1700000000012);
+
+      runCode({
+        eventName: 'lead',
+        paramTable1: [
+          { userParameter: 'email', userParameterValue: 'lead@example.com' }
+        ],
+        paramTable2: [
+          { text1: 'lead', text2: 'x' }
+        ],
+        gtmOnSuccess: () => {},
+        gtmOnFailure: () => { failed = true; }
+      });
+
+      assertThat(dispatched).isEqualTo(false);
+      assertThat(failed).isEqualTo(true);
 
 ___NOTES___
 
